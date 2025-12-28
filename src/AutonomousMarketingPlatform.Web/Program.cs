@@ -66,6 +66,9 @@ builder.Services.AddScoped<IFileStorageService>(serviceProvider =>
     return new FileStorageService(environment.WebRootPath ?? throw new InvalidOperationException("WebRootPath no configurado"), logger);
 });
 
+// Registrar servicios de memoria de marketing
+builder.Services.AddScoped<IMarketingMemoryService, MarketingMemoryService>();
+
 // Configurar CORS si es necesario
 builder.Services.AddCors(options =>
 {
