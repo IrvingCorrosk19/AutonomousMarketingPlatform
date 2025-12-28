@@ -28,24 +28,7 @@ public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Applicati
 
         optionsBuilder.UseNpgsql(connectionString);
 
-        // Crear un TenantService mock para tiempo de diseño
-        var mockTenantService = new DesignTimeTenantService();
-
-        return new ApplicationDbContext(optionsBuilder.Options, mockTenantService);
+        // En tiempo de diseño, no pasamos IServiceProvider (null)
+        return new ApplicationDbContext(optionsBuilder.Options, null, null);
     }
 }
-
-/// <summary>
-/// Implementación mock de ITenantService para tiempo de diseño.
-/// </summary>
-internal class DesignTimeTenantService : Domain.Interfaces.ITenantService
-{
-    public Guid? GetCurrentTenantId() => null;
-
-    public Task<bool> ValidateTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
-        => Task.FromResult(true);
-
-    public Task<Guid?> GetTenantIdBySubdomainAsync(string subdomain, CancellationToken cancellationToken = default)
-        => Task.FromResult<Guid?>(null);
-}
-

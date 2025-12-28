@@ -1,6 +1,8 @@
 using AutonomousMarketingPlatform.Domain.Entities;
 using AutonomousMarketingPlatform.Domain.Interfaces;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AutonomousMarketingPlatform.Infrastructure.Data;
 
@@ -10,12 +12,14 @@ namespace AutonomousMarketingPlatform.Infrastructure.Data;
 /// </summary>
 public class ApplicationDbContext : DbContext
 {
-    private readonly ITenantService? _tenantService;
+    private readonly IHttpContextAccessor? _httpContextAccessor;
+    private readonly IServiceProvider? _serviceProvider;
 
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, ITenantService? tenantService = null)
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, IHttpContextAccessor? httpContextAccessor = null, IServiceProvider? serviceProvider = null)
         : base(options)
     {
-        _tenantService = tenantService;
+        _httpContextAccessor = httpContextAccessor;
+        _serviceProvider = serviceProvider;
     }
 
     // DbSets
@@ -156,10 +160,25 @@ public class ApplicationDbContext : DbContext
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        // Solo asignar TenantId si TenantService está disponible (no en tiempo de diseño)
-        if (_tenantService != null)
+        // Obtener TenantService de forma lazy para evitar dependencia circular
+        Guid? tenantId = null;
+        
+        if (_serviceProvider != null)
         {
-            var tenantId = _tenantService.GetCurrentTenantId();
+            try
+            {
+                var tenantService = _serviceProvider.GetService(typeof(ITenantService)) as ITenantService;
+                tenantId = tenantService?.GetCurrentTenantId();
+            }
+            catch
+            {
+                // Si no está disponible (tiempo de diseño), continuar sin asignar TenantId
+            }
+        }
+
+        // Solo asignar TenantId si está disponible
+        if (tenantId.HasValue)
+        {
 
             // Asegurar que todas las entidades ITenantEntity tengan TenantId asignado
             var entries = ChangeTracker.Entries()

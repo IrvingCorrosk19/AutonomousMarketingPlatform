@@ -2,7 +2,6 @@ using AutonomousMarketingPlatform.Domain.Interfaces;
 using AutonomousMarketingPlatform.Infrastructure.Data;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace AutonomousMarketingPlatform.Infrastructure.Services;
 
@@ -13,22 +12,13 @@ namespace AutonomousMarketingPlatform.Infrastructure.Services;
 public class TenantService : ITenantService
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly IDbContextFactory<ApplicationDbContext>? _contextFactory;
-    private readonly ApplicationDbContext? _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
     private Guid? _cachedTenantId;
-
-    public TenantService(IHttpContextAccessor httpContextAccessor, ApplicationDbContext context)
-    {
-        _httpContextAccessor = httpContextAccessor;
-        _context = context;
-        _contextFactory = null;
-    }
 
     public TenantService(IHttpContextAccessor httpContextAccessor, IDbContextFactory<ApplicationDbContext> contextFactory)
     {
         _httpContextAccessor = httpContextAccessor;
         _contextFactory = contextFactory;
-        _context = null;
     }
 
     public Guid? GetCurrentTenantId()
@@ -75,42 +65,18 @@ public class TenantService : ITenantService
 
     public async Task<bool> ValidateTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
-        var context = _context ?? (_contextFactory != null ? await _contextFactory.CreateDbContextAsync(cancellationToken) : null);
-        if (context == null) return false;
-
-        try
-        {
-            return await context.Tenants
-                .AnyAsync(t => t.Id == tenantId && t.IsActive, cancellationToken);
-        }
-        finally
-        {
-            if (_contextFactory != null && context != _context)
-            {
-                await context.DisposeAsync();
-            }
-        }
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+        return await context.Tenants
+            .AnyAsync(t => t.Id == tenantId && t.IsActive, cancellationToken);
     }
 
     public async Task<Guid?> GetTenantIdBySubdomainAsync(string subdomain, CancellationToken cancellationToken = default)
     {
-        var context = _context ?? (_contextFactory != null ? await _contextFactory.CreateDbContextAsync(cancellationToken) : null);
-        if (context == null) return null;
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+        var tenant = await context.Tenants
+            .FirstOrDefaultAsync(t => t.Subdomain == subdomain && t.IsActive, cancellationToken);
 
-        try
-        {
-            var tenant = await context.Tenants
-                .FirstOrDefaultAsync(t => t.Subdomain == subdomain && t.IsActive, cancellationToken);
-
-            return tenant?.Id;
-        }
-        finally
-        {
-            if (_contextFactory != null && context != _context)
-            {
-                await context.DisposeAsync();
-            }
-        }
+        return tenant?.Id;
     }
 }
 
