@@ -42,6 +42,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<GeneratedCopy> GeneratedCopies { get; set; }
     public DbSet<MarketingAssetPrompt> MarketingAssetPrompts { get; set; }
     public DbSet<CampaignDraft> CampaignDrafts { get; set; }
+    public DbSet<TenantAIConfig> TenantAIConfigs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -329,6 +330,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         modelBuilder.Entity<GeneratedCopy>().HasIndex(e => e.TenantId);
         modelBuilder.Entity<MarketingAssetPrompt>().HasIndex(e => e.TenantId);
         modelBuilder.Entity<CampaignDraft>().HasIndex(e => e.TenantId);
+        modelBuilder.Entity<TenantAIConfig>().HasIndex(e => e.TenantId);
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

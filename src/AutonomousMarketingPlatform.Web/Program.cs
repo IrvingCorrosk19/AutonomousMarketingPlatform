@@ -77,6 +77,12 @@ builder.Services.AddScoped<IMarketingMemoryService, MarketingMemoryService>();
 builder.Services.AddScoped<ISecurityService, SecurityService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 
+// Registrar servicio de encriptación
+builder.Services.AddScoped<IEncryptionService, EncryptionService>();
+
+// Registrar servicio de automatizaciones externas
+builder.Services.AddScoped<IExternalAutomationService, ExternalAutomationService>();
+
 // Registrar proveedor de IA
 builder.Services.AddHttpClient<IAIProvider, AutonomousMarketingPlatform.Infrastructure.Services.AI.OpenAIProvider>();
 

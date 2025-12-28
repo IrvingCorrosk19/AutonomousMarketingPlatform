@@ -1,4 +1,7 @@
+using AutonomousMarketingPlatform.Application.Services;
 using AutonomousMarketingPlatform.Domain.Interfaces;
+using AutonomousMarketingPlatform.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Text;
@@ -9,42 +12,113 @@ namespace AutonomousMarketingPlatform.Infrastructure.Services.AI;
 
 /// <summary>
 /// Implementación de IAIProvider usando OpenAI API.
-/// Mockeable y configurable mediante secrets/env.
+/// Obtiene la API key desde la base de datos (encriptada) o configuración como fallback.
 /// </summary>
 public class OpenAIProvider : IAIProvider
 {
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
     private readonly ILogger<OpenAIProvider> _logger;
-    private readonly string? _apiKey;
-    private readonly string _model;
-    private readonly bool _useMock;
+    private readonly ApplicationDbContext _dbContext;
+    private readonly IEncryptionService _encryptionService;
+    private readonly ITenantService _tenantService;
+    private string? _apiKey;
+    private string _model = "gpt-4";
+    private bool _useMock = true;
 
     public OpenAIProvider(
         HttpClient httpClient,
         IConfiguration configuration,
-        ILogger<OpenAIProvider> logger)
+        ILogger<OpenAIProvider> logger,
+        ApplicationDbContext dbContext,
+        IEncryptionService encryptionService,
+        ITenantService tenantService)
     {
         _httpClient = httpClient;
         _configuration = configuration;
         _logger = logger;
+        _dbContext = dbContext;
+        _encryptionService = encryptionService;
+        _tenantService = tenantService;
         
-        // Obtener API key de configuración (secrets/env)
+        // Intentar obtener API key desde configuración (fallback)
         _apiKey = _configuration["AI:OpenAI:ApiKey"];
         _model = _configuration["AI:OpenAI:Model"] ?? "gpt-4";
         var useMockConfig = _configuration["AI:UseMock"];
         _useMock = string.IsNullOrEmpty(_apiKey) || (useMockConfig != null && bool.Parse(useMockConfig));
 
-        if (!_useMock && string.IsNullOrEmpty(_apiKey))
+        // Configurar HttpClient base
+        _httpClient.BaseAddress = new Uri("https://api.openai.com/v1/");
+    }
+
+    /// <summary>
+    /// Obtiene la API key desde la base de datos para el tenant actual.
+    /// </summary>
+    private async Task<string?> GetApiKeyFromDatabaseAsync()
+    {
+        try
         {
-            _logger.LogWarning("OpenAI API Key no configurada. Usando modo mock.");
+            var tenantId = _tenantService.GetCurrentTenantId();
+            if (!tenantId.HasValue)
+            {
+                _logger.LogWarning("No se pudo obtener TenantId para cargar configuración de IA");
+                return null;
+            }
+
+            var config = await _dbContext.TenantAIConfigs
+                .FirstOrDefaultAsync(c => c.TenantId == tenantId.Value && 
+                                          c.Provider == "OpenAI" && 
+                                          c.IsActive);
+
+            if (config == null)
+            {
+                _logger.LogDebug("No se encontró configuración de IA en DB para tenant {TenantId}", tenantId);
+                return null;
+            }
+
+            // Desencriptar API key
+            var decryptedKey = _encryptionService.Decrypt(config.EncryptedApiKey);
+            
+            // Actualizar estadísticas de uso
+            config.LastUsedAt = DateTime.UtcNow;
+            config.UsageCount++;
+            await _dbContext.SaveChangesAsync();
+
+            _model = config.Model;
+            return decryptedKey;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al obtener API key desde base de datos");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Obtiene la API key (desde DB o configuración) y configura el HttpClient.
+    /// </summary>
+    private async Task EnsureApiKeyAsync()
+    {
+        if (!string.IsNullOrEmpty(_apiKey) && !_useMock)
+            return;
+
+        // Intentar obtener desde DB primero
+        var dbKey = await GetApiKeyFromDatabaseAsync();
+        if (!string.IsNullOrEmpty(dbKey))
+        {
+            _apiKey = dbKey;
+            _useMock = false;
+        }
+        else if (string.IsNullOrEmpty(_apiKey))
+        {
+            _logger.LogWarning("OpenAI API Key no configurada ni en DB ni en configuración. Usando modo mock.");
             _useMock = true;
         }
 
-        // Configurar HttpClient
-        if (!_useMock)
+        // Configurar HttpClient si tenemos API key
+        if (!_useMock && !string.IsNullOrEmpty(_apiKey))
         {
-            _httpClient.BaseAddress = new Uri("https://api.openai.com/v1/");
+            _httpClient.DefaultRequestHeaders.Remove("Authorization");
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
         }
     }
@@ -55,6 +129,8 @@ public class OpenAIProvider : IAIProvider
         string? campaignContext,
         CancellationToken cancellationToken = default)
     {
+        await EnsureApiKeyAsync();
+
         if (_useMock)
         {
             return GenerateMockStrategy(contentDescription, userContext, campaignContext);
@@ -70,6 +146,8 @@ public class OpenAIProvider : IAIProvider
         string? userContext,
         CancellationToken cancellationToken = default)
     {
+        await EnsureApiKeyAsync();
+
         if (_useMock)
         {
             return GenerateMockCopies(strategy, contentDescription);
@@ -86,6 +164,8 @@ public class OpenAIProvider : IAIProvider
         string? userContext,
         CancellationToken cancellationToken = default)
     {
+        await EnsureApiKeyAsync();
+
         if (_useMock)
         {
             return GenerateMockHashtags(copy);
@@ -103,6 +183,8 @@ public class OpenAIProvider : IAIProvider
         string? userContext,
         CancellationToken cancellationToken = default)
     {
+        await EnsureApiKeyAsync();
+
         if (_useMock)
         {
             return GenerateMockImagePrompt(strategy, contentDescription);
@@ -118,6 +200,8 @@ public class OpenAIProvider : IAIProvider
         string? userContext,
         CancellationToken cancellationToken = default)
     {
+        await EnsureApiKeyAsync();
+
         if (_useMock)
         {
             return GenerateMockVideoPrompt(strategy, contentDescription);
@@ -133,6 +217,8 @@ public class OpenAIProvider : IAIProvider
         string? assetType,
         CancellationToken cancellationToken = default)
     {
+        await EnsureApiKeyAsync();
+
         if (_useMock)
         {
             return GenerateMockChecklist(channel, copy, assetType);
@@ -150,6 +236,13 @@ public class OpenAIProvider : IAIProvider
     {
         try
         {
+            await EnsureApiKeyAsync();
+
+            if (_useMock || string.IsNullOrEmpty(_apiKey))
+            {
+                throw new InvalidOperationException("API key no disponible");
+            }
+
             var requestBody = new
             {
                 model = _model,

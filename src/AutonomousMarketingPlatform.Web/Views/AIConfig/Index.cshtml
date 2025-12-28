@@ -1,0 +1,99 @@
+@model AutonomousMarketingPlatform.Application.DTOs.TenantAIConfigDto
+@{
+    ViewData["Title"] = "Configuración de IA";
+}
+
+<div class="content-wrapper">
+    <section class="content">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fas fa-robot mr-2"></i>Configuración de IA
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            @if (TempData["SuccessMessage"] != null)
+                            {
+                                <div class="alert alert-success alert-dismissible">
+                                    <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+                                    <i class="icon fas fa-check"></i> @TempData["SuccessMessage"]
+                                </div>
+                            }
+
+                            @if (TempData["ErrorMessage"] != null)
+                            {
+                                <div class="alert alert-danger alert-dismissible">
+                                    <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+                                    <i class="icon fas fa-ban"></i> @TempData["ErrorMessage"]
+                                </div>
+                            }
+
+                            <form asp-action="Save" method="post">
+                                @Html.AntiForgeryToken()
+
+                                <div class="form-group">
+                                    <label for="Provider">Proveedor de IA</label>
+                                    <select class="form-control" id="Provider" name="Provider" required>
+                                        <option value="OpenAI" selected>OpenAI</option>
+                                        <option value="Anthropic" disabled>Anthropic (Próximamente)</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="ApiKey">API Key</label>
+                                    <input type="password" class="form-control" id="ApiKey" name="ApiKey" 
+                                           placeholder="Ingrese su API key de OpenAI" required>
+                                    <small class="form-text text-muted">
+                                        <i class="fas fa-shield-alt mr-1"></i>
+                                        La API key se almacenará encriptada en la base de datos.
+                                    </small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="Model">Modelo</label>
+                                    <select class="form-control" id="Model" name="Model">
+                                        <option value="gpt-4" selected>GPT-4</option>
+                                        <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="IsActive" name="IsActive" value="true" checked>
+                                        <label class="form-check-label" for="IsActive">
+                                            Activar esta configuración
+                                        </label>
+                                    </div>
+                                </div>
+
+                                @if (Model != null && Model.Id != Guid.Empty)
+                                {
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle mr-2"></i>
+                                        <strong>Configuración existente:</strong><br>
+                                        Último uso: @(Model.LastUsedAt?.ToString("g") ?? "Nunca")<br>
+                                        Veces usado: @Model.UsageCount
+                                    </div>
+                                }
+
+                                <div class="form-group">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save mr-2"></i>Guardar Configuración
+                                    </button>
+                                    <a href="/" class="btn btn-secondary">
+                                        <i class="fas fa-times mr-2"></i>Cancelar
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
