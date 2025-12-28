@@ -53,6 +53,9 @@ builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped(typeof(IRepository<>), typeof(BaseRepository<>));
 builder.Services.AddScoped<ICampaignRepository, CampaignRepository>();
 
+// Registrar UnitOfWork
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
 // Registrar MediatR para CQRS
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.Load("AutonomousMarketingPlatform.Application")));
 
@@ -73,6 +76,9 @@ builder.Services.AddScoped<IMarketingMemoryService, MarketingMemoryService>();
 // Registrar servicios de seguridad y auditoría
 builder.Services.AddScoped<ISecurityService, SecurityService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
+
+// Registrar proveedor de IA
+builder.Services.AddHttpClient<IAIProvider, AutonomousMarketingPlatform.Infrastructure.Services.AI.OpenAIProvider>();
 
 // Configurar ASP.NET Core Identity
 builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>

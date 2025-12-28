@@ -38,6 +38,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<AutomationExecution> AutomationExecutions { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
     public DbSet<UserTenant> UserTenants { get; set; }
+    public DbSet<MarketingPack> MarketingPacks { get; set; }
+    public DbSet<GeneratedCopy> GeneratedCopies { get; set; }
+    public DbSet<MarketingAssetPrompt> MarketingAssetPrompts { get; set; }
+    public DbSet<CampaignDraft> CampaignDrafts { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -235,6 +239,73 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // Configuración de MarketingPack
+        modelBuilder.Entity<MarketingPack>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.TenantId, e.ContentId });
+            entity.HasIndex(e => new { e.TenantId, e.Status });
+            entity.Property(e => e.Strategy).IsRequired();
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
+            
+            entity.HasOne(e => e.Content)
+                .WithMany()
+                .HasForeignKey(e => e.ContentId)
+                .OnDelete(DeleteBehavior.Restrict);
+            
+            entity.HasOne(e => e.Campaign)
+                .WithMany()
+                .HasForeignKey(e => e.CampaignId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Configuración de GeneratedCopy
+        modelBuilder.Entity<GeneratedCopy>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.TenantId, e.MarketingPackId });
+            entity.Property(e => e.CopyType).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Content).IsRequired();
+            
+            entity.HasOne(e => e.MarketingPack)
+                .WithMany(mp => mp.Copies)
+                .HasForeignKey(e => e.MarketingPackId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configuración de MarketingAssetPrompt
+        modelBuilder.Entity<MarketingAssetPrompt>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.TenantId, e.MarketingPackId });
+            entity.Property(e => e.AssetType).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Prompt).IsRequired();
+            
+            entity.HasOne(e => e.MarketingPack)
+                .WithMany(mp => mp.AssetPrompts)
+                .HasForeignKey(e => e.MarketingPackId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configuración de CampaignDraft
+        modelBuilder.Entity<CampaignDraft>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.TenantId, e.Status });
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
+            
+            entity.HasOne(e => e.MarketingPack)
+                .WithMany()
+                .HasForeignKey(e => e.MarketingPackId)
+                .OnDelete(DeleteBehavior.Restrict);
+            
+            entity.HasOne(e => e.ConvertedCampaign)
+                .WithMany()
+                .HasForeignKey(e => e.ConvertedCampaignId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
         // Aplicar índices para mejorar rendimiento en consultas multi-tenant
         ApplyTenantIndexes(modelBuilder);
     }
@@ -254,6 +325,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         modelBuilder.Entity<AutomationState>().HasIndex(e => e.TenantId);
         modelBuilder.Entity<AutomationExecution>().HasIndex(e => e.TenantId);
         modelBuilder.Entity<AuditLog>().HasIndex(e => e.TenantId);
+        modelBuilder.Entity<MarketingPack>().HasIndex(e => e.TenantId);
+        modelBuilder.Entity<GeneratedCopy>().HasIndex(e => e.TenantId);
+        modelBuilder.Entity<MarketingAssetPrompt>().HasIndex(e => e.TenantId);
+        modelBuilder.Entity<CampaignDraft>().HasIndex(e => e.TenantId);
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
