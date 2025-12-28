@@ -118,8 +118,9 @@ builder.Services.ConfigureApplicationCookie(options =>
 // Registrar TenantResolverService
 builder.Services.AddScoped<ITenantResolverService, TenantResolverService>();
 
-// Registrar RoleSeeder
+// Registrar RoleSeeder y UserSeeder
 builder.Services.AddScoped<RoleSeeder>();
+builder.Services.AddScoped<UserSeeder>();
 
 // Configurar logging estructurado
 builder.Logging.ClearProviders();
@@ -163,13 +164,49 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Seed roles al iniciar (solo en desarrollo o primera vez)
+// Seed roles y usuario inicial (solo en desarrollo)
 if (app.Environment.IsDevelopment())
 {
     using (var scope = app.Services.CreateScope())
     {
-        var roleSeeder = scope.ServiceProvider.GetRequiredService<RoleSeeder>();
-        await roleSeeder.SeedRolesAsync();
+        try
+        {
+            var roleSeeder = scope.ServiceProvider.GetRequiredService<RoleSeeder>();
+            await roleSeeder.SeedRolesAsync();
+
+            // Crear tenant y usuario de prueba
+            var userSeeder = scope.ServiceProvider.GetRequiredService<UserSeeder>();
+            
+            // Crear tenant de prueba
+            var tenant = await userSeeder.CreateTestTenantAsync(
+                name: "Tenant de Prueba",
+                subdomain: "test",
+                contactEmail: "test@example.com");
+
+            if (tenant != null)
+            {
+                // Crear usuario Owner
+                await userSeeder.CreateInitialUserAsync(
+                    email: "admin@test.com",
+                    password: "Admin123!",
+                    fullName: "Administrador de Prueba",
+                    tenantId: tenant.Id,
+                    roleName: "Owner");
+
+                // Crear usuario Marketer
+                await userSeeder.CreateInitialUserAsync(
+                    email: "marketer@test.com",
+                    password: "Marketer123!",
+                    fullName: "Marketer de Prueba",
+                    tenantId: tenant.Id,
+                    roleName: "Marketer");
+            }
+        }
+        catch (Exception ex)
+        {
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            logger.LogError(ex, "Error al inicializar datos de prueba");
+        }
     }
 }
 

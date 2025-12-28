@@ -1,13 +1,17 @@
 using AutonomousMarketingPlatform.Application.DTOs;
 using AutonomousMarketingPlatform.Application.UseCases.Memory;
+using AutonomousMarketingPlatform.Web.Helpers;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AutonomousMarketingPlatform.Web.Controllers;
 
 /// <summary>
 /// Controlador para visualización de memoria de marketing (solo lectura).
+/// Accesible para todos los usuarios autenticados.
 /// </summary>
+[Authorize]
 public class MemoryController : Controller
 {
     private readonly IMediator _mediator;
@@ -27,12 +31,16 @@ public class MemoryController : Controller
     {
         try
         {
-            // TODO: Obtener TenantId del usuario autenticado
-            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            var tenantId = UserHelper.GetTenantId(User);
+            if (!tenantId.HasValue)
+            {
+                _logger.LogWarning("Usuario autenticado sin TenantId");
+                return RedirectToAction("Login", "Account");
+            }
 
             var query = new QueryMemoryQuery
             {
-                TenantId = tenantId,
+                TenantId = tenantId.Value,
                 MemoryTypes = !string.IsNullOrEmpty(type) ? new List<string> { type } : null,
                 Tags = !string.IsNullOrEmpty(tags) ? tags.Split(',').ToList() : null,
                 Limit = 50
@@ -61,12 +69,16 @@ public class MemoryController : Controller
     {
         try
         {
-            // TODO: Obtener TenantId del usuario autenticado
-            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            var tenantId = UserHelper.GetTenantId(User);
+            if (!tenantId.HasValue)
+            {
+                _logger.LogWarning("Usuario autenticado sin TenantId");
+                return RedirectToAction("Login", "Account");
+            }
 
             var query = new QueryMemoryQuery
             {
-                TenantId = tenantId,
+                TenantId = tenantId.Value,
                 CampaignId = campaignId,
                 Limit = 100
             };
@@ -89,14 +101,19 @@ public class MemoryController : Controller
     {
         try
         {
-            // TODO: Obtener TenantId y UserId del usuario autenticado
-            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-            var userId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            var tenantId = UserHelper.GetTenantId(User);
+            var userId = UserHelper.GetUserId(User);
+
+            if (!tenantId.HasValue || !userId.HasValue)
+            {
+                _logger.LogWarning("Usuario autenticado sin TenantId o UserId");
+                return RedirectToAction("Login", "Account");
+            }
 
             var query = new GetMemoryContextForAIQuery
             {
-                TenantId = tenantId,
-                UserId = userId,
+                TenantId = tenantId.Value,
+                UserId = userId.Value,
                 CampaignId = campaignId
             };
 

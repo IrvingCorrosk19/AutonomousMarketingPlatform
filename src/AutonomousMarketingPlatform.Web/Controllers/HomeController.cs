@@ -1,5 +1,6 @@
 using AutonomousMarketingPlatform.Application.UseCases.Dashboard;
 using AutonomousMarketingPlatform.Web.Attributes;
+using AutonomousMarketingPlatform.Web.Helpers;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -22,12 +23,16 @@ public class HomeController : Controller
     {
         try
         {
-            // TODO: Obtener TenantId del usuario autenticado
-            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            var tenantId = UserHelper.GetTenantId(User);
+            if (!tenantId.HasValue)
+            {
+                _logger.LogWarning("Usuario autenticado sin TenantId");
+                return RedirectToAction("Login", "Account");
+            }
 
             var query = new GetDashboardDataQuery
             {
-                TenantId = tenantId
+                TenantId = tenantId.Value
             };
 
             var dashboardData = await _mediator.Send(query);

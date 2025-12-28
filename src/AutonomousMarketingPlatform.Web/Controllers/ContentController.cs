@@ -1,6 +1,9 @@
 using AutonomousMarketingPlatform.Application.DTOs;
 using AutonomousMarketingPlatform.Application.UseCases.Content;
+using AutonomousMarketingPlatform.Web.Attributes;
+using AutonomousMarketingPlatform.Web.Helpers;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 
@@ -8,7 +11,10 @@ namespace AutonomousMarketingPlatform.Web.Controllers;
 
 /// <summary>
 /// Controlador para gestión de contenido (imágenes y videos).
+/// Requiere rol Marketer, Admin o Owner para cargar contenido.
 /// </summary>
+[Authorize]
+[AuthorizeRole("Marketer", "Admin", "Owner")]
 public class ContentController : Controller
 {
     private readonly IMediator _mediator;
@@ -44,14 +50,18 @@ public class ContentController : Controller
 
         try
         {
-            // TODO: Obtener UserId y TenantId del usuario autenticado
-            var userId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-            var tenantId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+            var userId = UserHelper.GetUserId(User);
+            var tenantId = UserHelper.GetTenantId(User);
+
+            if (!userId.HasValue || !tenantId.HasValue)
+            {
+                return BadRequest(new { error = "Error de autenticación. Por favor, inicie sesión nuevamente." });
+            }
 
             var command = new UploadFilesCommand
             {
-                UserId = userId,
-                TenantId = tenantId,
+                UserId = userId.Value,
+                TenantId = tenantId.Value,
                 Files = files,
                 CampaignId = campaignId,
                 Description = description,
