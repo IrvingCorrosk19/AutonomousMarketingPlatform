@@ -1,0 +1,110 @@
+@{
+    ViewData["Title"] = "Dashboard";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="row">
+    <!-- Campañas Activas -->
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-info">
+            <div class="inner">
+                <h3 id="active-campaigns">0</h3>
+                <p>Campañas Activas</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-bullhorn"></i>
+            </div>
+            <a href="/campaigns" class="small-box-footer">
+                Más información <i class="fas fa-arrow-circle-right"></i>
+            </a>
+        </div>
+    </div>
+    
+    <!-- Automatizaciones Running -->
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-success">
+            <div class="inner">
+                <h3 id="running-automations">0</h3>
+                <p>Automatizaciones Activas</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-robot"></i>
+            </div>
+            <a href="/automations" class="small-box-footer">
+                Más información <i class="fas fa-arrow-circle-right"></i>
+            </a>
+        </div>
+    </div>
+    
+    <!-- Contenido Generado -->
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-warning">
+            <div class="inner">
+                <h3 id="generated-content">0</h3>
+                <p>Contenido Generado (IA)</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-magic"></i>
+            </div>
+            <a href="/content" class="small-box-footer">
+                Más información <i class="fas fa-arrow-circle-right"></i>
+            </a>
+        </div>
+    </div>
+    
+    <!-- Presupuesto Total -->
+    <div class="col-lg-3 col-6">
+        <div class="small-box bg-danger">
+            <div class="inner">
+                <h3 id="total-budget">$0</h3>
+                <p>Presupuesto Total</p>
+            </div>
+            <div class="icon">
+                <i class="fas fa-dollar-sign"></i>
+            </div>
+            <a href="/campaigns" class="small-box-footer">
+                Más información <i class="fas fa-arrow-circle-right"></i>
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Estado de Automatizaciones -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Estado de Automatizaciones</h3>
+            </div>
+            <div class="card-body">
+                <div id="automation-status">
+                    <p class="text-muted">Cargando...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Campañas Recientes -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Campañas Recientes</h3>
+            </div>
+            <div class="card-body">
+                <div id="recent-campaigns">
+                    <p class="text-muted">Cargando...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Aquí se cargarán los datos del dashboard vía AJAX
+        $(document).ready(function() {
+            // TODO: Implementar carga de datos
+        });
+    </script>
+}
+
