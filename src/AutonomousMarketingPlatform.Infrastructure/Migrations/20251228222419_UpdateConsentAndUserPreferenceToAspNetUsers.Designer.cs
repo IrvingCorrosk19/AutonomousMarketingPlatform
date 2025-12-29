@@ -3,6 +3,7 @@ using System;
 using AutonomousMarketingPlatform.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AutonomousMarketingPlatform.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251228222419_UpdateConsentAndUserPreferenceToAspNetUsers")]
+    partial class UpdateConsentAndUserPreferenceToAspNetUsers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -622,11 +625,16 @@ namespace AutonomousMarketingPlatform.Infrastructure.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("UserId1")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("UserId1");
 
                     b.HasIndex("TenantId", "UserId", "ConsentType");
 
@@ -1188,6 +1196,62 @@ namespace AutonomousMarketingPlatform.Infrastructure.Migrations
                     b.ToTable("TenantAIConfigs");
                 });
 
+            modelBuilder.Entity("AutonomousMarketingPlatform.Domain.Entities.User", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("EmailVerificationToken")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("EmailVerified")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastLoginAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "Email")
+                        .IsUnique();
+
+                    b.ToTable("User");
+                });
+
             modelBuilder.Entity("AutonomousMarketingPlatform.Domain.Entities.UserPreference", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1224,11 +1288,16 @@ namespace AutonomousMarketingPlatform.Infrastructure.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("UserId1")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("UserId1");
 
                     b.HasIndex("TenantId", "UserId", "PreferenceKey");
 
@@ -1449,6 +1518,10 @@ namespace AutonomousMarketingPlatform.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("AutonomousMarketingPlatform.Domain.Entities.User", null)
+                        .WithMany("Consents")
+                        .HasForeignKey("UserId1");
+
                     b.Navigation("User");
                 });
 
@@ -1566,6 +1639,17 @@ namespace AutonomousMarketingPlatform.Infrastructure.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("AutonomousMarketingPlatform.Domain.Entities.User", b =>
+                {
+                    b.HasOne("AutonomousMarketingPlatform.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("AutonomousMarketingPlatform.Domain.Entities.UserPreference", b =>
                 {
                     b.HasOne("AutonomousMarketingPlatform.Domain.Entities.ApplicationUser", "User")
@@ -1573,6 +1657,10 @@ namespace AutonomousMarketingPlatform.Infrastructure.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("AutonomousMarketingPlatform.Domain.Entities.User", null)
+                        .WithMany("Preferences")
+                        .HasForeignKey("UserId1");
 
                     b.Navigation("User");
                 });
@@ -1681,6 +1769,13 @@ namespace AutonomousMarketingPlatform.Infrastructure.Migrations
             modelBuilder.Entity("AutonomousMarketingPlatform.Domain.Entities.Tenant", b =>
                 {
                     b.Navigation("Campaigns");
+                });
+
+            modelBuilder.Entity("AutonomousMarketingPlatform.Domain.Entities.User", b =>
+                {
+                    b.Navigation("Consents");
+
+                    b.Navigation("Preferences");
                 });
 #pragma warning restore 612, 618
         }

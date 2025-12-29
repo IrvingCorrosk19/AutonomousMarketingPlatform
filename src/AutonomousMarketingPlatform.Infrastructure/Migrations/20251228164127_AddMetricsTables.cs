@@ -11,11 +11,6 @@ namespace AutonomousMarketingPlatform.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<Guid>(
-                name: "CampaignId1",
-                table: "MarketingPacks",
-                type: "uuid",
-                nullable: true);
 
             migrationBuilder.AlterColumn<string>(
                 name: "Description",
@@ -197,10 +192,6 @@ namespace AutonomousMarketingPlatform.Infrastructure.Migrations
                         onDelete: ReferentialAction.Restrict);
                 });
 
-            migrationBuilder.CreateIndex(
-                name: "IX_MarketingPacks_CampaignId1",
-                table: "MarketingPacks",
-                column: "CampaignId1");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Campaigns_TenantId_Status",
@@ -284,21 +275,11 @@ namespace AutonomousMarketingPlatform.Infrastructure.Migrations
                 table: "PublishingJobs",
                 columns: new[] { "TenantId", "ScheduledDate" });
 
-            migrationBuilder.AddForeignKey(
-                name: "FK_MarketingPacks_Campaigns_CampaignId1",
-                table: "MarketingPacks",
-                column: "CampaignId1",
-                principalTable: "Campaigns",
-                principalColumn: "Id");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropForeignKey(
-                name: "FK_MarketingPacks_Campaigns_CampaignId1",
-                table: "MarketingPacks");
-
             migrationBuilder.DropTable(
                 name: "CampaignMetrics");
 
@@ -309,16 +290,8 @@ namespace AutonomousMarketingPlatform.Infrastructure.Migrations
                 name: "PublishingJobs");
 
             migrationBuilder.DropIndex(
-                name: "IX_MarketingPacks_CampaignId1",
-                table: "MarketingPacks");
-
-            migrationBuilder.DropIndex(
                 name: "IX_Campaigns_TenantId_Status",
                 table: "Campaigns");
-
-            migrationBuilder.DropColumn(
-                name: "CampaignId1",
-                table: "MarketingPacks");
 
             migrationBuilder.DropColumn(
                 name: "Notes",
