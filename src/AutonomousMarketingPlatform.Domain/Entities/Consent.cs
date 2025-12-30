@@ -1,4 +1,5 @@
 using AutonomousMarketingPlatform.Domain.Common;
+using Microsoft.AspNetCore.Identity;
 
 namespace AutonomousMarketingPlatform.Domain.Entities;
 
@@ -49,6 +50,6 @@ public class Consent : BaseEntity, ITenantEntity
     public string? IpAddress { get; set; }
 
     // Navigation properties
-    public virtual User User { get; set; } = null!;
+    public virtual ApplicationUser User { get; set; } = null!;
 }
 

@@ -86,6 +86,12 @@ public class ContentListItemDto
     public string ContentType { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string FileUrl { get; set; } = string.Empty;
+    public string? OriginalFileName { get; set; }
+    public long? FileSize { get; set; }
+    public string? MimeType { get; set; }
+    public bool IsAiGenerated { get; set; }
+    public string? Tags { get; set; }
+    public Guid? CampaignId { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 

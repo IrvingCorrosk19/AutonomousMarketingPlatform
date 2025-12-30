@@ -1,9 +1,13 @@
 using AutonomousMarketingPlatform.Application.DTOs;
+using AutonomousMarketingPlatform.Domain.Entities;
 using AutonomousMarketingPlatform.Domain.Interfaces;
 using MediatR;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using ContentEntity = AutonomousMarketingPlatform.Domain.Entities.Content;
 using CampaignEntity = AutonomousMarketingPlatform.Domain.Entities.Campaign;
 using AutomationStateEntity = AutonomousMarketingPlatform.Domain.Entities.AutomationState;
+using PublishingJobEntity = AutonomousMarketingPlatform.Domain.Entities.PublishingJob;
 
 namespace AutonomousMarketingPlatform.Application.UseCases.Dashboard;
 
@@ -24,29 +28,34 @@ public class GetDashboardDataQueryHandler : IRequestHandler<GetDashboardDataQuer
     private readonly IRepository<CampaignEntity> _campaignRepository;
     private readonly IRepository<ContentEntity> _contentRepository;
     private readonly IRepository<AutomationStateEntity> _automationRepository;
-    private readonly IRepository<Domain.Entities.User> _userRepository;
+    private readonly IRepository<PublishingJobEntity> _publishingJobRepository;
+    private readonly UserManager<ApplicationUser> _userManager;
 
     public GetDashboardDataQueryHandler(
         IRepository<CampaignEntity> campaignRepository,
         IRepository<ContentEntity> contentRepository,
         IRepository<AutomationStateEntity> automationRepository,
-        IRepository<Domain.Entities.User> userRepository)
+        IRepository<PublishingJobEntity> publishingJobRepository,
+        UserManager<ApplicationUser> userManager)
     {
         _campaignRepository = campaignRepository;
         _contentRepository = contentRepository;
         _automationRepository = automationRepository;
-        _userRepository = userRepository;
+        _publishingJobRepository = publishingJobRepository;
+        _userManager = userManager;
     }
 
     public async Task<DashboardDto> Handle(GetDashboardDataQuery request, CancellationToken cancellationToken)
     {
         var dashboard = new DashboardDto();
 
-        // Estado del Sistema
-        var activeUsers = await _userRepository.FindAsync(
-            u => u.IsActive && u.LastLoginAt.HasValue && u.LastLoginAt.Value > DateTime.UtcNow.AddHours(-24),
-            request.TenantId,
-            cancellationToken);
+        // Estado del Sistema - Contar usuarios activos del tenant
+        var activeUsers = await _userManager.Users
+            .Where(u => u.TenantId == request.TenantId 
+                && u.IsActive 
+                && u.LastLoginAt.HasValue 
+                && u.LastLoginAt.Value > DateTime.UtcNow.AddHours(-24))
+            .CountAsync(cancellationToken);
 
         dashboard.SystemStatus = new SystemStatusDto
         {
@@ -54,7 +63,7 @@ public class GetDashboardDataQueryHandler : IRequestHandler<GetDashboardDataQuer
             Status = "Active",
             StatusMessage = "Sistema operativo y funcionando correctamente",
             LastActivity = DateTime.UtcNow,
-            ActiveUsers = activeUsers.Count()
+            ActiveUsers = activeUsers
         };
 
         // Resumen de Contenido
@@ -138,6 +147,13 @@ public class GetDashboardDataQueryHandler : IRequestHandler<GetDashboardDataQuer
             })
             .ToList();
 
+        // Contar publicaciones del tenant
+        var allPublishingJobs = await _publishingJobRepository.GetAllAsync(request.TenantId, cancellationToken);
+        var publishingJobsList = allPublishingJobs.ToList();
+        
+        // Contar publicaciones exitosas (publicadas)
+        var totalPublications = publishingJobsList.Count(pj => pj.Status == "Success");
+
         // Métricas
         dashboard.Metrics = new MetricsDto
         {
@@ -146,7 +162,7 @@ public class GetDashboardDataQueryHandler : IRequestHandler<GetDashboardDataQuer
             TotalBudget = campaignsList.Where(c => c.Budget.HasValue).Sum(c => c.Budget ?? 0),
             TotalSpent = campaignsList.Where(c => c.SpentAmount.HasValue).Sum(c => c.SpentAmount ?? 0),
             TotalContentGenerated = contentList.Count(c => c.IsAiGenerated),
-            TotalPublications = 0, // TODO: Implementar cuando tengamos publicaciones
+            TotalPublications = totalPublications,
             AverageCampaignPerformance = campaignsList.Any() ? 85.5 : 0, // Placeholder
             MetricsDate = DateTime.UtcNow
         };

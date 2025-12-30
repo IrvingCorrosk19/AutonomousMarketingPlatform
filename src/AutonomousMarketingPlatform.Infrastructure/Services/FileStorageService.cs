@@ -32,18 +32,22 @@ public class FileStorageService : IFileStorageService
     {
         try
         {
-            // Generar nombre único para el archivo temporal
-            var fileName = $"{Guid.NewGuid()}_{Path.GetFileName(file.FileName)}";
-            var filePath = Path.Combine(_tempFolder, fileName);
+            // Generar nombre seguro usando solo GUID + extensión
+            // El nombre original se guarda en la BD, NO en el filesystem
+            var extension = Path.GetExtension(file.FileName);
+            var safeFileName = $"{Guid.NewGuid():N}{extension}";
+            
+            var tempPath = Path.Combine(_tempFolder, safeFileName);
+
+            // Asegurar que el directorio existe
+            Directory.CreateDirectory(Path.GetDirectoryName(tempPath)!);
 
             // Guardar archivo
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await file.CopyToAsync(stream, cancellationToken);
-            }
+            using var stream = new FileStream(tempPath, FileMode.Create);
+            await file.CopyToAsync(stream, cancellationToken);
 
-            _logger.LogInformation("Archivo temporal guardado: {FilePath}", filePath);
-            return filePath;
+            _logger.LogInformation("Archivo temporal guardado: {FilePath} (original: {OriginalFileName})", tempPath, file.FileName);
+            return tempPath;
         }
         catch (Exception ex)
         {

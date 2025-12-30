@@ -1,6 +1,6 @@
 using AutonomousMarketingPlatform.Application.Services;
 using AutonomousMarketingPlatform.Domain.Entities;
-using AutonomousMarketingPlatform.Domain.Interfaces;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
@@ -12,16 +12,16 @@ namespace AutonomousMarketingPlatform.Infrastructure.Services;
 /// </summary>
 public class SecurityService : ISecurityService
 {
-    private readonly IRepository<User> _userRepository;
+    private readonly UserManager<ApplicationUser> _userManager;
     private readonly IDbContextFactory<Data.ApplicationDbContext> _dbContextFactory;
     private readonly ILogger<SecurityService> _logger;
 
     public SecurityService(
-        IRepository<User> userRepository,
+        UserManager<ApplicationUser> userManager,
         IDbContextFactory<Data.ApplicationDbContext> dbContextFactory,
         ILogger<SecurityService> logger)
     {
-        _userRepository = userRepository;
+        _userManager = userManager;
         _dbContextFactory = dbContextFactory;
         _logger = logger;
     }
@@ -45,8 +45,8 @@ public class SecurityService : ISecurityService
     {
         try
         {
-            var user = await _userRepository.GetByIdAsync(userId, tenantId, cancellationToken);
-            return user != null && user.IsActive;
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            return user != null && user.TenantId == tenantId && user.IsActive;
         }
         catch (Exception ex)
         {

@@ -6,6 +6,7 @@ using AutonomousMarketingPlatform.Infrastructure.Repositories;
 using AutonomousMarketingPlatform.Infrastructure.Services;
 using AutonomousMarketingPlatform.Web.Middleware;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection;
 
@@ -52,6 +53,7 @@ builder.Services.AddScoped<ITenantService, TenantService>();
 // Registrar repositorios
 builder.Services.AddScoped(typeof(IRepository<>), typeof(BaseRepository<>));
 builder.Services.AddScoped<ICampaignRepository, CampaignRepository>();
+builder.Services.AddScoped<ITenantRepository, TenantRepository>();
 
 // Registrar UnitOfWork
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -91,6 +93,14 @@ builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IEncryptionService, EncryptionService>();
 
 // Registrar servicio de automatizaciones externas
+// Configurar HttpClient para ExternalAutomationService (n8n)
+builder.Services.AddHttpClient<ExternalAutomationService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+    var n8nBaseUrl = builder.Configuration["N8n:BaseUrl"] ?? "http://localhost:5678";
+    client.BaseAddress = new Uri(n8nBaseUrl);
+});
+
 builder.Services.AddScoped<IExternalAutomationService, ExternalAutomationService>();
 
 // Registrar proveedor de IA
@@ -229,13 +239,22 @@ if (app.Environment.IsDevelopment())
 
             if (tenant != null)
             {
-                // Crear usuario Owner
-                await userSeeder.CreateInitialUserAsync(
-                    email: "admin@test.com",
-                    password: "Admin123!",
-                    fullName: "Administrador de Prueba",
-                    tenantId: tenant.Id,
-                    roleName: "Owner");
+                // Verificar si admin@test.com ya existe como super admin
+                // Si existe con TenantId = Guid.Empty, no crear otro
+                var existingAdmin = await scope.ServiceProvider
+                    .GetRequiredService<UserManager<ApplicationUser>>()
+                    .FindByEmailAsync("admin@test.com");
+                
+                if (existingAdmin == null || existingAdmin.TenantId != Guid.Empty)
+                {
+                    // Crear usuario Owner solo si no existe o no es super admin
+                    await userSeeder.CreateInitialUserAsync(
+                        email: "admin@test.com",
+                        password: "Admin123!",
+                        fullName: "Administrador de Prueba",
+                        tenantId: tenant.Id,
+                        roleName: "Owner");
+                }
 
                 // Crear usuario Marketer
                 await userSeeder.CreateInitialUserAsync(
@@ -269,7 +288,13 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
-// 4. Tenant Resolver (antes de auth)
+app.UseStaticFiles();
+app.UseRouting();
+
+// 4. Authentication (debe ir después de UseRouting)
+app.UseAuthentication();
+
+// 5. Tenant Resolver (después de auth, para poder leer claims)
 app.Use(async (context, next) =>
 {
     var tenantResolver = context.RequestServices.GetRequiredService<ITenantResolverService>();
@@ -281,20 +306,16 @@ app.Use(async (context, next) =>
     await next();
 });
 
-// 5. Validación de tenant (antes de routing)
+// 6. Validación de tenant (después de auth, para poder verificar super admin)
 app.UseMiddleware<TenantValidationMiddleware>();
 
-app.UseStaticFiles();
-app.UseRouting();
-
-// 5. CORS
+// 7. CORS
 app.UseCors();
 
-// 6. Middleware de validación de consentimientos
+// 8. Middleware de validación de consentimientos
 app.UseConsentValidation();
 
-// 7. Authentication y Authorization
-app.UseAuthentication();
+// 9. Authorization (DEBE ir después de UseRouting y ANTES de MapControllerRoute)
 app.UseAuthorization();
 
 app.MapControllerRoute(

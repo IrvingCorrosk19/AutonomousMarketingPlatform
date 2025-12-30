@@ -128,3 +128,7 @@ Thumbs.db
 
 # Migrations (mantener en el repo)
 # !src/**/Migrations/
+
+# Uploads temporales (no deben estar en el repo)
+**/wwwroot/uploads/temp/*
+**/wwwroot/uploads/temp/

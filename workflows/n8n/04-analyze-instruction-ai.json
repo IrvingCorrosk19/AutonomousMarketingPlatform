@@ -1,0 +1,300 @@
+{
+  "name": "Analyze Instruction AI",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "analyze-instruction",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-analyze",
+      "name": "Webhook - Receive Instruction",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "analyze-instruction-webhook",
+      "notes": "Recibe la instrucción del usuario para analizar"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-instruction",
+              "name": "instruction",
+              "value": "={{ $json.body.instruction }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-tenant-id",
+              "name": "tenantId",
+              "value": "={{ $json.body.tenantId || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-user-id",
+              "name": "userId",
+              "value": "={{ $json.body.userId || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-data",
+      "name": "Extract Instruction Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [450, 300],
+      "notes": "Extrae la instrucción y datos del payload"
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "create",
+        "model": "={{ $env.OPENAI_MODEL || 'gpt-4' }}",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Eres un analizador experto de instrucciones de marketing. Tu tarea es analizar la instrucción del usuario y extraer información estructurada. DEBES responder SOLO con un JSON válido, sin texto adicional, sin markdown, sin explicaciones. El JSON debe tener exactamente esta estructura:\n\n{\n  \"objective\": \"string - objetivo principal de la instrucción\",\n  \"tone\": \"string - tono recomendado (profesional, casual, formal, amigable, técnico, etc.)\",\n  \"urgency\": \"string - nivel de urgencia (low, medium, high, critical)\",\n  \"contentType\": \"string - tipo de contenido recomendado (post, story, reel, video, carousel, article, etc.)\",\n  \"targetAudience\": \"string - audiencia objetivo si se menciona\",\n  \"keyMessages\": [\"string\"],\n  \"hashtags\": [\"string\"],\n  \"channels\": [\"string\"]\n}"
+            },
+            {
+              "role": "user",
+              "content": "={{ 'Analiza la siguiente instrucción de marketing y extrae la información estructurada:\n\n' + $json.instruction + '\n\nResponde SOLO con el JSON, sin texto adicional.' }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.3,
+          "maxTokens": 500
+        },
+        "authentication": "openAiApi"
+      },
+      "id": "openai-analyze",
+      "name": "OpenAI - Analyze Instruction",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [650, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-api-credentials",
+          "name": "OpenAI API"
+        }
+      },
+      "notes": "Analiza la instrucción usando OpenAI para extraer información estructurada"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parsear la respuesta de OpenAI\nconst response = $input.item.json;\nlet analysis = {};\n\ntry {\n  // Intentar extraer el JSON de la respuesta\n  let content = response.choices?.[0]?.message?.content || response.message?.content || '';\n  \n  // Limpiar el contenido (remover markdown code blocks si existen)\n  content = content.trim();\n  if (content.startsWith('```json')) {\n    content = content.replace(/```json\\s*/g, '').replace(/```\\s*/g, '');\n  } else if (content.startsWith('```')) {\n    content = content.replace(/```\\s*/g, '');\n  }\n  \n  // Parsear el JSON\n  analysis = JSON.parse(content);\n} catch (error) {\n  // Si falla, intentar extraer JSON del texto completo\n  try {\n    const jsonMatch = response.choices?.[0]?.message?.content?.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      analysis = JSON.parse(jsonMatch[0]);\n    } else {\n      // Fallback: crear estructura básica\n      analysis = {\n        objective: 'No se pudo determinar',\n        tone: 'profesional',\n        urgency: 'medium',\n        contentType: 'post',\n        targetAudience: '',\n        keyMessages: [],\n        hashtags: [],\n        channels: []\n      };\n    }\n  } catch (parseError) {\n    // Último fallback\n    analysis = {\n      objective: 'Error al analizar',\n      tone: 'profesional',\n      urgency: 'medium',\n      contentType: 'post',\n      targetAudience: '',\n      keyMessages: [],\n      hashtags: [],\n      channels: []\n    };\n  }\n}\n\n// Asegurar que todos los campos requeridos existan\nconst result = {\n  objective: analysis.objective || 'No especificado',\n  tone: analysis.tone || 'profesional',\n  urgency: analysis.urgency || 'medium',\n  contentType: analysis.contentType || 'post',\n  targetAudience: analysis.targetAudience || '',\n  keyMessages: Array.isArray(analysis.keyMessages) ? analysis.keyMessages : [],\n  hashtags: Array.isArray(analysis.hashtags) ? analysis.hashtags : [],\n  channels: Array.isArray(analysis.channels) ? analysis.channels : [],\n  originalInstruction: $('Extract Instruction Data').item.json.instruction,\n  analyzedAt: new Date().toISOString(),\n  tenantId: $('Extract Instruction Data').item.json.tenantId || '',\n  userId: $('Extract Instruction Data').item.json.userId || ''\n};\n\nreturn result;"
+      },
+      "id": "parse-response",
+      "name": "Parse OpenAI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300],
+      "notes": "Parsea la respuesta de OpenAI y estructura el JSON final"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-analysis",
+              "name": "analysis",
+              "value": "={{ $json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "structure-response",
+      "name": "Structure Final Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [1050, 300],
+      "notes": "Estructura la respuesta final en formato estándar"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Instruction analyzed successfully\", \"data\": $json.analysis } }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-success",
+      "name": "Respond - Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 300],
+      "notes": "Responde con éxito y el análisis estructurado"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"Analysis error\", \"message\": \"Failed to analyze instruction\", \"details\": { \"error\": $json.error || $json.message || \"Unknown error\" } } }}",
+        "options": {
+          "responseCode": 500,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-error",
+      "name": "Respond - Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [850, 500],
+      "notes": "Responde con error si falla el análisis"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-has-response",
+              "leftValue": "={{ $json.choices !== undefined || $json.message !== undefined }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-openai-response",
+      "name": "Check OpenAI Response",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [850, 400],
+      "notes": "Verifica que OpenAI haya respondido correctamente"
+    }
+  ],
+  "connections": {
+    "Webhook - Receive Instruction": {
+      "main": [
+        [
+          {
+            "node": "Extract Instruction Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Instruction Data": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Analyze Instruction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Analyze Instruction": {
+      "main": [
+        [
+          {
+            "node": "Check OpenAI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check OpenAI Response": {
+      "main": [
+        [
+          {
+            "node": "Respond - Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parse OpenAI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse OpenAI Response": {
+      "main": [
+        [
+          {
+            "node": "Structure Final Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structure Final Response": {
+      "main": [
+        [
+          {
+            "node": "Respond - Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z",
+      "id": "marketing-automation",
+      "name": "Marketing Automation"
+    },
+    {
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z",
+      "id": "ai-analysis",
+      "name": "AI Analysis"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2025-01-01T00:00:00.000Z",
+  "versionId": "1"
+}
+

@@ -81,9 +81,14 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResultDto>
                 return result;
             }
 
-            // Validar que el usuario pertenece al tenant
-            var belongsToTenant = await _securityService.ValidateUserBelongsToTenantAsync(user.Id, request.TenantId, cancellationToken);
-            if (!belongsToTenant)
+            // Validar que el usuario pertenece al tenant (excepto para super admin)
+            // Super admin tiene TenantId == Guid.Empty
+            var isSuperAdmin = request.TenantId == Guid.Empty || user.TenantId == Guid.Empty;
+            
+            if (!isSuperAdmin)
+            {
+                var belongsToTenant = await _securityService.ValidateUserBelongsToTenantAsync(user.Id, request.TenantId, cancellationToken);
+                if (!belongsToTenant)
             {
                 _logger.LogWarning("Intento de login con usuario de otro tenant: UserId={UserId}, TenantId={TenantId}, IP={IP}",
                     user.Id, request.TenantId, request.IpAddress);
@@ -107,6 +112,12 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResultDto>
                 result.Success = false;
                 result.ErrorMessage = "Credenciales inválidas";
                 return result;
+                }
+            }
+            else
+            {
+                _logger.LogInformation("Login de super admin (sin tenant): UserId={UserId}, Email={Email}, IP={IP}",
+                    user.Id, user.Email, request.IpAddress);
             }
 
             // Verificar si el usuario está bloqueado

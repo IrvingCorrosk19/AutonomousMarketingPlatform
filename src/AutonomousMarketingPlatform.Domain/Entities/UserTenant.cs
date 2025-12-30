@@ -6,7 +6,7 @@ namespace AutonomousMarketingPlatform.Domain.Entities;
 /// Relación entre Usuario y Tenant con un rol específico.
 /// Permite que un usuario pertenezca a múltiples tenants con diferentes roles.
 /// </summary>
-public class UserTenant : BaseEntity
+public class UserTenant : BaseEntity, ITenantEntity
 {
     /// <summary>
     /// Identificador del usuario.

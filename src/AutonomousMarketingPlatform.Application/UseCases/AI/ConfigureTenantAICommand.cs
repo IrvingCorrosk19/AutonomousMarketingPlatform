@@ -3,6 +3,7 @@ using AutonomousMarketingPlatform.Application.Services;
 using AutonomousMarketingPlatform.Domain.Entities;
 using AutonomousMarketingPlatform.Domain.Interfaces;
 using MediatR;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 
 namespace AutonomousMarketingPlatform.Application.UseCases.AI;
@@ -30,6 +31,7 @@ public class ConfigureTenantAICommandHandler : IRequestHandler<ConfigureTenantAI
     private readonly ISecurityService _securityService;
     private readonly IAuditService _auditService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILogger<ConfigureTenantAICommandHandler> _logger;
 
     public ConfigureTenantAICommandHandler(
@@ -38,6 +40,7 @@ public class ConfigureTenantAICommandHandler : IRequestHandler<ConfigureTenantAI
         ISecurityService securityService,
         IAuditService auditService,
         IUnitOfWork unitOfWork,
+        UserManager<ApplicationUser> userManager,
         ILogger<ConfigureTenantAICommandHandler> logger)
     {
         _configRepository = configRepository;
@@ -45,6 +48,7 @@ public class ConfigureTenantAICommandHandler : IRequestHandler<ConfigureTenantAI
         _securityService = securityService;
         _auditService = auditService;
         _unitOfWork = unitOfWork;
+        _userManager = userManager;
         _logger = logger;
     }
 
@@ -62,7 +66,23 @@ public class ConfigureTenantAICommandHandler : IRequestHandler<ConfigureTenantAI
             }
 
             // Validar que el usuario tiene permisos (Owner o Admin)
-            // TODO: Agregar validación de roles
+            var user = await _userManager.FindByIdAsync(request.UserId.ToString());
+            if (user == null)
+            {
+                throw new UnauthorizedAccessException("Usuario no encontrado");
+            }
+
+            var userRoles = await _userManager.GetRolesAsync(user);
+            var hasPermission = userRoles.Contains("Owner") || userRoles.Contains("Admin");
+            
+            if (!hasPermission)
+            {
+                _logger.LogWarning(
+                    "Usuario {UserId} intentó configurar IA sin permisos. Roles: {Roles}",
+                    request.UserId,
+                    string.Join(", ", userRoles));
+                throw new UnauthorizedAccessException("Solo usuarios con rol Owner o Admin pueden configurar IA");
+            }
 
             // Buscar configuración existente
             var existingConfigs = await _configRepository.FindAsync(

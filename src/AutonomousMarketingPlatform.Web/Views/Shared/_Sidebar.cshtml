@@ -11,7 +11,7 @@
             <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
                 <!-- Dashboard -->
                 <li class="nav-item">
-                    <a asp-controller="Home" asp-action="Index" class="nav-link">
+                    <a href="/Home/Index" class="nav-link">
                         <i class="nav-icon fas fa-tachometer-alt"></i>
                         <p>Dashboard</p>
                     </a>
@@ -19,7 +19,7 @@
                 
                 <!-- Campañas -->
                 <li class="nav-item">
-                    <a asp-controller="Campaigns" asp-action="Index" class="nav-link">
+                    <a href="/Campaigns" class="nav-link">
                         <i class="nav-icon fas fa-bullhorn"></i>
                         <p>Campañas</p>
                     </a>
@@ -27,7 +27,7 @@
                 
                 <!-- Publicaciones -->
                 <li class="nav-item">
-                    <a asp-controller="Publishing" asp-action="Index" class="nav-link">
+                    <a href="/Publishing" class="nav-link">
                         <i class="nav-icon fas fa-paper-plane"></i>
                         <p>Publicaciones</p>
                     </a>
@@ -35,7 +35,7 @@
                 
                 <!-- Métricas -->
                 <li class="nav-item">
-                    <a asp-controller="Metrics" asp-action="Index" class="nav-link">
+                    <a href="/Metrics" class="nav-link">
                         <i class="nav-icon fas fa-chart-line"></i>
                         <p>Métricas</p>
                     </a>
@@ -43,23 +43,15 @@
                 
                 <!-- Contenido -->
                 <li class="nav-item">
-                    <a asp-controller="Content" asp-action="Upload" class="nav-link">
+                    <a href="/Content/Upload" class="nav-link">
                         <i class="nav-icon fas fa-images"></i>
                         <p>Cargar Contenido</p>
                     </a>
                 </li>
                 
-                <!-- Automatizaciones -->
-                <li class="nav-item">
-                    <a asp-controller="Automations" asp-action="Index" class="nav-link">
-                        <i class="nav-icon fas fa-robot"></i>
-                        <p>Automatizaciones</p>
-                    </a>
-                </li>
-                
                 <!-- Memoria de Marketing -->
                 <li class="nav-item">
-                    <a asp-controller="Memory" asp-action="Index" class="nav-link">
+                    <a href="/Memory" class="nav-link">
                         <i class="nav-icon fas fa-brain"></i>
                         <p>Memoria</p>
                     </a>
@@ -67,33 +59,25 @@
                 
                 <!-- Consentimientos -->
                 <li class="nav-item">
-                    <a asp-controller="Consents" asp-action="Index" class="nav-link">
+                    <a href="/Consents" class="nav-link">
                         <i class="nav-icon fas fa-shield-alt"></i>
                         <p>Consentimientos</p>
                     </a>
                 </li>
                 
-                <!-- Preferencias -->
-                <li class="nav-item">
-                    <a asp-controller="Preferences" asp-action="Index" class="nav-link">
-                        <i class="nav-icon fas fa-cog"></i>
-                        <p>Preferencias</p>
-                    </a>
-                </li>
-                
                 <!-- Configuración de IA -->
                 <li class="nav-item">
-                    <a asp-controller="AIConfig" asp-action="Index" class="nav-link">
+                    <a href="/AIConfig" class="nav-link">
                         <i class="nav-icon fas fa-robot"></i>
                         <p>Configuración IA</p>
                     </a>
                 </li>
                 
-                <!-- Configuración -->
+                <!-- Configuración de n8n -->
                 <li class="nav-item">
-                    <a asp-controller="Settings" asp-action="Index" class="nav-link">
-                        <i class="nav-icon fas fa-sliders-h"></i>
-                        <p>Configuración</p>
+                    <a href="/N8nConfig" class="nav-link">
+                        <i class="nav-icon fas fa-plug"></i>
+                        <p>Configuración n8n</p>
                     </a>
                 </li>
             </ul>

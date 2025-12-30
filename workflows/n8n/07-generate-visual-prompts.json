@@ -1,0 +1,312 @@
+{
+  "name": "Generate Visual Prompts",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-visual-prompts",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-visual",
+      "name": "Webhook - Receive Context",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "generate-visual-prompts-webhook",
+      "notes": "Recibe contexto de campaña y memoria para generar prompts visuales"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-strategy",
+              "name": "strategy",
+              "value": "={{ $json.body.strategy || $json.body }}",
+              "type": "object"
+            },
+            {
+              "id": "assign-memory",
+              "name": "memory",
+              "value": "={{ $json.body.memory || {} }}",
+              "type": "object"
+            },
+            {
+              "id": "assign-copy",
+              "name": "copy",
+              "value": "={{ $json.body.copy || {} }}",
+              "type": "object"
+            },
+            {
+              "id": "assign-tenant-id",
+              "name": "tenantId",
+              "value": "={{ $json.body.tenantId || $json.body.strategy?.metadata?.tenantId || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-context",
+      "name": "Extract Campaign Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [450, 300],
+      "notes": "Extrae el contexto de campaña, memoria y copy"
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "create",
+        "model": "={{ $env.OPENAI_MODEL || 'gpt-4' }}",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Eres un experto en generación de prompts para IA visual (DALL-E, Midjourney, Stable Diffusion). Tu tarea es crear prompts optimizados y detallados para generar imágenes y videos basados en el contexto de marketing. DEBES responder SOLO con un JSON válido, sin texto adicional, sin markdown, sin explicaciones. El JSON debe tener exactamente esta estructura:\n\n{\n  \"imagePrompt\": \"string - prompt detallado y optimizado para generación de imágenes (mínimo 50 palabras, incluir estilo, composición, iluminación, colores, mood, detalles técnicos)\",\n  \"videoPrompt\": \"string - prompt detallado y optimizado para generación de videos (mínimo 50 palabras, incluir movimiento, escena, transiciones, estilo visual)\",\n  \"imageStyle\": \"string - estilo visual recomendado (realistic, artistic, minimalist, vibrant, etc.)\",\n  \"colorPalette\": [\"string\"],\n  \"mood\": \"string\",\n  \"aspectRatio\": \"string - formato recomendado (16:9, 1:1, 9:16, etc.)\",\n  \"technicalSpecs\": {\n    \"resolution\": \"string\",\n    \"quality\": \"string\",\n    \"lighting\": \"string\",\n    \"composition\": \"string\"\n  }\n}\n\nIMPORTANTE:\n- Los prompts deben ser descriptivos, específicos y optimizados para IA visual\n- Incluir detalles de estilo, composición, iluminación y mood\n- Considerar el tono y mensaje de la campaña\n- Los prompts deben ser directamente usables en herramientas de IA visual"
+            },
+            {
+              "role": "user",
+              "content": "={{ 'Genera prompts visuales optimizados para IA basados en el siguiente contexto:\n\n## Estrategia de Marketing:\n' + JSON.stringify($json.strategy, null, 2) + '\n\n## Copy Generado:\n' + JSON.stringify($json.copy, null, 2) + '\n\n## Memoria Histórica:\n' + JSON.stringify($json.memory, null, 2) + '\n\nConsidera:\n- El mensaje principal: ' + ($json.strategy.mainMessage || '') + '\n- El tono: ' + ($json.strategy.tone || 'profesional') + '\n- La audiencia objetivo: ' + ($json.strategy.targetAudience || '') + '\n- El formato recomendado: ' + ($json.strategy.recommendedFormat || 'post') + '\n- Los canales: ' + JSON.stringify($json.strategy.channels || []) + '\n- El copy generado para entender el contexto visual\n- Las preferencias históricas del tenant\n\nResponde SOLO con el JSON de los prompts visuales, sin texto adicional.' }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 1200
+        },
+        "authentication": "openAiApi"
+      },
+      "id": "openai-visual",
+      "name": "OpenAI - Generate Visual Prompts",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [650, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-api-credentials",
+          "name": "OpenAI API"
+        }
+      },
+      "notes": "Genera prompts visuales optimizados usando OpenAI basándose en estrategia, copy y memoria"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parsear la respuesta de OpenAI\nconst response = $input.item.json;\nlet visualPrompts = {};\n\ntry {\n  // Intentar extraer el JSON de la respuesta\n  let content = response.choices?.[0]?.message?.content || response.message?.content || '';\n  \n  // Limpiar el contenido (remover markdown code blocks si existen)\n  content = content.trim();\n  if (content.startsWith('```json')) {\n    content = content.replace(/```json\\s*/g, '').replace(/```\\s*/g, '');\n  } else if (content.startsWith('```')) {\n    content = content.replace(/```\\s*/g, '');\n  }\n  \n  // Parsear el JSON\n  visualPrompts = JSON.parse(content);\n} catch (error) {\n  // Si falla, intentar extraer JSON del texto completo\n  try {\n    const jsonMatch = response.choices?.[0]?.message?.content?.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      visualPrompts = JSON.parse(jsonMatch[0]);\n    } else {\n      // Fallback: crear estructura básica desde la estrategia\n      const strategy = $('Extract Campaign Context').item.json.strategy || {};\n      const copy = $('Extract Campaign Context').item.json.copy || {};\n      const mainMessage = strategy.mainMessage || copy.longCopy || 'Producto de marketing';\n      \n      visualPrompts = {\n        imagePrompt: `High-quality marketing image: ${mainMessage}. Professional photography style, vibrant colors, modern composition, natural lighting, engaging and attractive visual, optimized for social media, ${strategy.tone || 'professional'} tone`,\n        videoPrompt: `Marketing video: ${mainMessage}. Smooth camera movements, dynamic transitions, professional cinematography, vibrant colors, engaging visual storytelling, ${strategy.tone || 'professional'} aesthetic, optimized for social media`,\n        imageStyle: strategy.tone === 'casual' ? 'vibrant' : 'professional',\n        colorPalette: ['vibrant', 'modern'],\n        mood: strategy.tone || 'professional',\n        aspectRatio: strategy.recommendedFormat === 'story' ? '9:16' : strategy.recommendedFormat === 'reel' ? '9:16' : '1:1',\n        technicalSpecs: {\n          resolution: 'high',\n          quality: 'professional',\n          lighting: 'natural',\n          composition: 'balanced'\n        }\n      };\n    }\n  } catch (parseError) {\n    // Último fallback\n    const strategy = $('Extract Campaign Context').item.json.strategy || {};\n    visualPrompts = {\n      imagePrompt: 'High-quality marketing image, professional style, vibrant colors',\n      videoPrompt: 'Marketing video, professional cinematography, engaging visuals',\n      imageStyle: 'professional',\n      colorPalette: [],\n      mood: 'professional',\n      aspectRatio: '1:1',\n      technicalSpecs: {\n        resolution: 'high',\n        quality: 'professional',\n        lighting: 'natural',\n        composition: 'balanced'\n      }\n    };\n  }\n}\n\n// Asegurar que todos los campos requeridos existan\nconst finalPrompts = {\n  imagePrompt: visualPrompts.imagePrompt || 'High-quality marketing image, professional style',\n  videoPrompt: visualPrompts.videoPrompt || 'Marketing video, professional cinematography',\n  imageStyle: visualPrompts.imageStyle || 'professional',\n  colorPalette: Array.isArray(visualPrompts.colorPalette) ? visualPrompts.colorPalette : [],\n  mood: visualPrompts.mood || 'professional',\n  aspectRatio: visualPrompts.aspectRatio || '1:1',\n  technicalSpecs: {\n    resolution: visualPrompts.technicalSpecs?.resolution || 'high',\n    quality: visualPrompts.technicalSpecs?.quality || 'professional',\n    lighting: visualPrompts.technicalSpecs?.lighting || 'natural',\n    composition: visualPrompts.technicalSpecs?.composition || 'balanced'\n  }\n};\n\n// Agregar metadatos\nconst strategy = $('Extract Campaign Context').item.json.strategy || {};\nconst metadata = {\n  tenantId: $('Extract Campaign Context').item.json.tenantId || '',\n  generatedAt: new Date().toISOString(),\n  format: strategy.recommendedFormat || 'post',\n  channels: strategy.channels || [],\n  tone: strategy.tone || 'professional'\n};\n\nreturn {\n  ...finalPrompts,\n  metadata\n};"
+      },
+      "id": "build-prompts",
+      "name": "Build Visual Prompts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300],
+      "notes": "Construye los prompts visuales finales con estructura completa"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-prompts",
+              "name": "visualPrompts",
+              "value": "={{ $json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "structure-prompts",
+      "name": "Structure Visual Prompts Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [1050, 300],
+      "notes": "Estructura la respuesta final de los prompts visuales"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Visual prompts generated successfully\", \"data\": $json.visualPrompts } }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-success",
+      "name": "Respond - Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 300],
+      "notes": "Responde con éxito y los prompts visuales generados"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"Visual prompts generation error\", \"message\": \"Failed to generate visual prompts\", \"details\": { \"error\": $json.error || $json.message || \"Unknown error\" } } }}",
+        "options": {
+          "responseCode": 500,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-error",
+      "name": "Respond - Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [850, 500],
+      "notes": "Responde con error si falla la generación"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-has-response",
+              "leftValue": "={{ $json.choices !== undefined || $json.message !== undefined }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-openai-response",
+      "name": "Check OpenAI Response",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [850, 400],
+      "notes": "Verifica que OpenAI haya respondido correctamente"
+    }
+  ],
+  "connections": {
+    "Webhook - Receive Context": {
+      "main": [
+        [
+          {
+            "node": "Extract Campaign Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Campaign Context": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Generate Visual Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Generate Visual Prompts": {
+      "main": [
+        [
+          {
+            "node": "Check OpenAI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check OpenAI Response": {
+      "main": [
+        [
+          {
+            "node": "Respond - Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Visual Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Visual Prompts": {
+      "main": [
+        [
+          {
+            "node": "Structure Visual Prompts Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structure Visual Prompts Response": {
+      "main": [
+        [
+          {
+            "node": "Respond - Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z",
+      "id": "marketing-automation",
+      "name": "Marketing Automation"
+    },
+    {
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z",
+      "id": "visual-generation",
+      "name": "Visual Generation"
+    },
+    {
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z",
+      "id": "ai-generation",
+      "name": "AI Generation"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2025-01-01T00:00:00.000Z",
+  "versionId": "1"
+}
+

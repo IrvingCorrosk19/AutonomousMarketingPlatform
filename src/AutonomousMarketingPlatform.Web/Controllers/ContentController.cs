@@ -1,5 +1,6 @@
 using AutonomousMarketingPlatform.Application.DTOs;
 using AutonomousMarketingPlatform.Application.UseCases.Content;
+using AutonomousMarketingPlatform.Application.UseCases.Campaigns;
 using AutonomousMarketingPlatform.Web.Attributes;
 using AutonomousMarketingPlatform.Web.Helpers;
 using MediatR;
@@ -30,9 +31,35 @@ public class ContentController : Controller
     /// Vista principal para cargar archivos.
     /// </summary>
     [HttpGet]
-    public IActionResult Upload()
+    public async Task<IActionResult> Upload()
     {
-        return View();
+        try
+        {
+            var tenantId = UserHelper.GetTenantId(User);
+            if (!tenantId.HasValue)
+            {
+                return RedirectToAction("Login", "Account");
+            }
+
+            // Cargar campañas activas del tenant
+            var campaignsQuery = new ListCampaignsQuery
+            {
+                TenantId = tenantId.Value,
+                Status = "Active", // Solo campañas activas
+                Take = 100 // Límite razonable
+            };
+
+            var campaigns = await _mediator.Send(campaignsQuery);
+            ViewBag.Campaigns = campaigns;
+
+            return View();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al cargar vista de upload");
+            ViewBag.Campaigns = new List<CampaignListDto>();
+            return View();
+        }
     }
 
     /// <summary>
@@ -83,9 +110,35 @@ public class ContentController : Controller
     /// Vista para listar contenido cargado.
     /// </summary>
     [HttpGet]
-    public IActionResult Index()
+    public async Task<IActionResult> Index(Guid? campaignId = null, string? contentType = null)
     {
-        return View();
+        try
+        {
+            var tenantId = UserHelper.GetTenantId(User);
+            if (!tenantId.HasValue)
+            {
+                return RedirectToAction("Login", "Account");
+            }
+
+            var query = new ListContentQuery
+            {
+                TenantId = tenantId.Value,
+                CampaignId = campaignId,
+                ContentType = contentType
+            };
+
+            var content = await _mediator.Send(query);
+            
+            ViewBag.CampaignId = campaignId;
+            ViewBag.ContentType = contentType;
+            
+            return View(content);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al listar contenido");
+            return View(new List<ContentListItemDto>());
+        }
     }
 }
 

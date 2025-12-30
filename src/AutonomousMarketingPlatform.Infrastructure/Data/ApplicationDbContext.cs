@@ -28,7 +28,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     // DbSets
     public DbSet<Tenant> Tenants { get; set; }
     // Nota: Users ahora se maneja a través de ApplicationUser (Identity)
-    // public DbSet<User> Users { get; set; } // Mantener para migración, luego eliminar
     public DbSet<Consent> Consents { get; set; }
     public DbSet<Campaign> Campaigns { get; set; }
     public DbSet<Content> Contents { get; set; }
@@ -43,6 +42,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<MarketingAssetPrompt> MarketingAssetPrompts { get; set; }
     public DbSet<CampaignDraft> CampaignDrafts { get; set; }
     public DbSet<TenantAIConfig> TenantAIConfigs { get; set; }
+    public DbSet<TenantN8nConfig> TenantN8nConfigs { get; set; }
     public DbSet<PublishingJob> PublishingJobs { get; set; }
     public DbSet<CampaignMetrics> CampaignMetrics { get; set; }
     public DbSet<PublishingJobMetrics> PublishingJobMetrics { get; set; }
@@ -104,20 +104,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             entity.Property(e => e.ContactEmail).IsRequired().HasMaxLength(255);
         });
 
-        // Configuración de User
-        modelBuilder.Entity<User>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.TenantId, e.Email }).IsUnique();
-            entity.Property(e => e.Email).IsRequired().HasMaxLength(255);
-            entity.Property(e => e.FullName).IsRequired().HasMaxLength(200);
-            entity.Property(e => e.Role).IsRequired().HasMaxLength(50);
-            
-            entity.HasOne(e => e.Tenant)
-                .WithMany(t => t.Users)
-                .HasForeignKey(e => e.TenantId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
+        // Nota: La entidad User (dominio) fue eliminada.
+        // Los usuarios ahora se manejan exclusivamente a través de ApplicationUser (Identity)
 
         // Configuración de Consent
         modelBuilder.Entity<Consent>(entity =>
@@ -127,7 +115,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             entity.Property(e => e.ConsentType).IsRequired().HasMaxLength(100);
             
             entity.HasOne(e => e.User)
-                .WithMany(u => u.Consents)
+                .WithMany()
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
@@ -241,7 +229,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             entity.Property(e => e.PreferenceKey).IsRequired().HasMaxLength(100);
             
             entity.HasOne(e => e.User)
-                .WithMany(u => u.Preferences)
+                .WithMany()
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
@@ -333,9 +321,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
                 .OnDelete(DeleteBehavior.Restrict);
             
             entity.HasOne(e => e.Campaign)
-                .WithMany()
+                .WithMany(c => c.MarketingPacks)
                 .HasForeignKey(e => e.CampaignId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.SetNull)
+                .IsRequired(false);
         });
 
         // Configuración de GeneratedCopy
@@ -395,7 +384,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     /// </summary>
     private void ApplyTenantIndexes(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<User>().HasIndex(e => e.TenantId);
+        // Nota: User (dominio) fue eliminado, ahora se usa ApplicationUser (Identity)
         modelBuilder.Entity<Consent>().HasIndex(e => e.TenantId);
         modelBuilder.Entity<Campaign>().HasIndex(e => e.TenantId);
         modelBuilder.Entity<Content>().HasIndex(e => e.TenantId);
@@ -408,7 +397,36 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         modelBuilder.Entity<GeneratedCopy>().HasIndex(e => e.TenantId);
         modelBuilder.Entity<MarketingAssetPrompt>().HasIndex(e => e.TenantId);
         modelBuilder.Entity<CampaignDraft>().HasIndex(e => e.TenantId);
-        modelBuilder.Entity<TenantAIConfig>().HasIndex(e => e.TenantId);
+        // Configuración de TenantAIConfig
+        modelBuilder.Entity<TenantAIConfig>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.TenantId, e.Provider }).IsUnique();
+            entity.Property(e => e.Provider).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Model).IsRequired().HasMaxLength(100);
+            
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Configuración de TenantN8nConfig
+        modelBuilder.Entity<TenantN8nConfig>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.TenantId).IsUnique();
+            entity.Property(e => e.BaseUrl).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.ApiUrl).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.DefaultWebhookUrl).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.WebhookUrlsJson).HasColumnType("text");
+            
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<PublishingJob>().HasIndex(e => e.TenantId);
         modelBuilder.Entity<CampaignMetrics>().HasIndex(e => e.TenantId);
         modelBuilder.Entity<PublishingJobMetrics>().HasIndex(e => e.TenantId);

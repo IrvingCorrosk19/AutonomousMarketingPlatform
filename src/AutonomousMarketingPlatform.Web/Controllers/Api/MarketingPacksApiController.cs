@@ -1,0 +1,276 @@
+using AutonomousMarketingPlatform.Application.DTOs;
+using AutonomousMarketingPlatform.Application.UseCases.AI;
+using AutonomousMarketingPlatform.Domain.Entities;
+using AutonomousMarketingPlatform.Domain.Interfaces;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
+
+namespace AutonomousMarketingPlatform.Web.Controllers.Api;
+
+/// <summary>
+/// Controlador API para gestión de MarketingPacks.
+/// Usado por workflows n8n para guardar packs generados.
+/// </summary>
+/// <remarks>
+/// NOTA DE SEGURIDAD: En producción, este endpoint debería tener autenticación por API key
+/// o estar protegido por una red privada. Por ahora se permite acceso sin autenticación
+/// para facilitar la integración con n8n en desarrollo.
+/// </remarks>
+[ApiController]
+[Route("api/marketing-packs")]
+[AllowAnonymous]
+public class MarketingPacksApiController : ControllerBase
+{
+    private readonly IRepository<MarketingPack> _marketingPackRepository;
+    private readonly IRepository<GeneratedCopy> _generatedCopyRepository;
+    private readonly IRepository<MarketingAssetPrompt> _assetPromptRepository;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<MarketingPacksApiController> _logger;
+
+    public MarketingPacksApiController(
+        IRepository<MarketingPack> marketingPackRepository,
+        IRepository<GeneratedCopy> generatedCopyRepository,
+        IRepository<MarketingAssetPrompt> assetPromptRepository,
+        IUnitOfWork unitOfWork,
+        ILogger<MarketingPacksApiController> logger)
+    {
+        _marketingPackRepository = marketingPackRepository;
+        _generatedCopyRepository = generatedCopyRepository;
+        _assetPromptRepository = assetPromptRepository;
+        _unitOfWork = unitOfWork;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Crea o actualiza un MarketingPack desde n8n.
+    /// Endpoint usado por workflows n8n para guardar packs generados.
+    /// </summary>
+    /// <param name="request">Datos del MarketingPack a guardar</param>
+    /// <param name="cancellationToken">Token de cancelación</param>
+    /// <returns>MarketingPack guardado</returns>
+    /// <response code="200">MarketingPack guardado exitosamente</response>
+    /// <response code="400">Si los datos son inválidos</response>
+    /// <response code="500">Error interno del servidor</response>
+    [HttpPost]
+    [ProducesResponseType(typeof(MarketingPackResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CreateOrUpdateMarketingPack(
+        [FromBody] CreateMarketingPackRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Validar datos requeridos
+            if (request.TenantId == Guid.Empty)
+            {
+                _logger.LogWarning("CreateMarketingPack llamado con tenantId vacío");
+                return BadRequest(new { error = "tenantId is required and must be a valid GUID" });
+            }
+
+            if (request.UserId == Guid.Empty)
+            {
+                _logger.LogWarning("CreateMarketingPack llamado con userId vacío");
+                return BadRequest(new { error = "userId is required and must be a valid GUID" });
+            }
+
+            if (request.ContentId == Guid.Empty)
+            {
+                _logger.LogWarning("CreateMarketingPack llamado con contentId vacío");
+                return BadRequest(new { error = "contentId is required and must be a valid GUID" });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Strategy))
+            {
+                return BadRequest(new { error = "strategy is required" });
+            }
+
+            // Verificar si el pack ya existe (si se proporcionó ID)
+            MarketingPack? existingPack = null;
+            if (request.Id.HasValue && request.Id.Value != Guid.Empty)
+            {
+                var existingPacks = await _marketingPackRepository.FindAsync(
+                    p => p.Id == request.Id.Value,
+                    request.TenantId,
+                    cancellationToken);
+                existingPack = existingPacks.FirstOrDefault();
+            }
+
+            MarketingPack marketingPack;
+            if (existingPack != null)
+            {
+                // Actualizar pack existente
+                existingPack.Strategy = request.Strategy;
+                existingPack.Status = request.Status ?? "Generated";
+                existingPack.Version = request.Version;
+                existingPack.Metadata = request.Metadata;
+                existingPack.UpdatedAt = DateTime.UtcNow;
+                marketingPack = existingPack;
+                await _marketingPackRepository.UpdateAsync(marketingPack, cancellationToken);
+            }
+            else
+            {
+                // Crear nuevo pack
+                marketingPack = new MarketingPack
+                {
+                    Id = request.Id ?? Guid.NewGuid(),
+                    TenantId = request.TenantId,
+                    UserId = request.UserId,
+                    ContentId = request.ContentId,
+                    CampaignId = request.CampaignId,
+                    Strategy = request.Strategy,
+                    Status = request.Status ?? "Generated",
+                    Version = request.Version,
+                    Metadata = request.Metadata
+                };
+                await _marketingPackRepository.AddAsync(marketingPack, cancellationToken);
+            }
+
+            // Guardar GeneratedCopies si se proporcionaron
+            if (request.Copies != null && request.Copies.Any())
+            {
+                foreach (var copyDto in request.Copies)
+                {
+                    var copy = new GeneratedCopy
+                    {
+                        Id = copyDto.Id ?? Guid.NewGuid(),
+                        TenantId = request.TenantId,
+                        MarketingPackId = marketingPack.Id,
+                        CopyType = copyDto.CopyType,
+                        Content = copyDto.Content,
+                        Hashtags = copyDto.Hashtags,
+                        SuggestedChannel = copyDto.SuggestedChannel,
+                        PublicationChecklist = copyDto.PublicationChecklist != null
+                            ? JsonSerializer.Serialize(copyDto.PublicationChecklist)
+                            : null
+                    };
+                    await _generatedCopyRepository.AddAsync(copy, cancellationToken);
+                }
+            }
+
+            // Guardar MarketingAssetPrompts si se proporcionaron
+            if (request.AssetPrompts != null && request.AssetPrompts.Any())
+            {
+                foreach (var promptDto in request.AssetPrompts)
+                {
+                    var prompt = new MarketingAssetPrompt
+                    {
+                        Id = promptDto.Id ?? Guid.NewGuid(),
+                        TenantId = request.TenantId,
+                        MarketingPackId = marketingPack.Id,
+                        AssetType = promptDto.AssetType,
+                        Prompt = promptDto.Prompt,
+                        NegativePrompt = promptDto.NegativePrompt,
+                        Parameters = promptDto.Parameters != null
+                            ? JsonSerializer.Serialize(promptDto.Parameters)
+                            : null,
+                        SuggestedChannel = promptDto.SuggestedChannel
+                    };
+                    await _assetPromptRepository.AddAsync(prompt, cancellationToken);
+                }
+            }
+
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation(
+                "MarketingPack {PackId} saved for Tenant {TenantId} with status {Status}",
+                marketingPack.Id,
+                request.TenantId,
+                marketingPack.Status);
+
+            var response = new MarketingPackResponse
+            {
+                Id = marketingPack.Id,
+                TenantId = marketingPack.TenantId,
+                UserId = marketingPack.UserId,
+                ContentId = marketingPack.ContentId,
+                CampaignId = marketingPack.CampaignId,
+                Strategy = marketingPack.Strategy,
+                Status = marketingPack.Status,
+                Version = marketingPack.Version,
+                Metadata = marketingPack.Metadata,
+                CreatedAt = marketingPack.CreatedAt
+            };
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Error al guardar MarketingPack para Tenant {TenantId}",
+                request.TenantId);
+
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new
+                {
+                    error = "Internal server error",
+                    message = "Failed to save marketing pack"
+                });
+        }
+    }
+}
+
+/// <summary>
+/// Request para crear o actualizar MarketingPack.
+/// </summary>
+public class CreateMarketingPackRequest
+{
+    public Guid? Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid UserId { get; set; }
+    public Guid ContentId { get; set; }
+    public Guid? CampaignId { get; set; }
+    public string Strategy { get; set; } = string.Empty;
+    public string? Status { get; set; }
+    public int Version { get; set; } = 1;
+    public string? Metadata { get; set; }
+    public List<GeneratedCopyRequest>? Copies { get; set; }
+    public List<MarketingAssetPromptRequest>? AssetPrompts { get; set; }
+}
+
+/// <summary>
+/// Request para GeneratedCopy.
+/// </summary>
+public class GeneratedCopyRequest
+{
+    public Guid? Id { get; set; }
+    public string CopyType { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public string? Hashtags { get; set; }
+    public string? SuggestedChannel { get; set; }
+    public Dictionary<string, object>? PublicationChecklist { get; set; }
+}
+
+/// <summary>
+/// Request para MarketingAssetPrompt.
+/// </summary>
+public class MarketingAssetPromptRequest
+{
+    public Guid? Id { get; set; }
+    public string AssetType { get; set; } = string.Empty;
+    public string Prompt { get; set; } = string.Empty;
+    public string? NegativePrompt { get; set; }
+    public Dictionary<string, object>? Parameters { get; set; }
+    public string? SuggestedChannel { get; set; }
+}
+
+/// <summary>
+/// Respuesta del endpoint de MarketingPack.
+/// </summary>
+public class MarketingPackResponse
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid UserId { get; set; }
+    public Guid ContentId { get; set; }
+    public Guid? CampaignId { get; set; }
+    public string Strategy { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public int Version { get; set; }
+    public string? Metadata { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+

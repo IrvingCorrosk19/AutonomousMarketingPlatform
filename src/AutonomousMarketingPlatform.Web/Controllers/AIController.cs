@@ -93,10 +93,23 @@ public class AIController : Controller
                 return RedirectToAction("Login", "Account");
             }
 
-            // TODO: Implementar query para obtener MarketingPack por ID
-            // Por ahora retornamos vista vacía
-            ViewBag.MarketingPackId = id;
-            return View();
+            var query = new GetMarketingPackQuery
+            {
+                TenantId = tenantId.Value,
+                MarketingPackId = id
+            };
+
+            var marketingPack = await _mediator.Send(query);
+
+            if (marketingPack == null)
+            {
+                _logger.LogWarning("MarketingPack {Id} no encontrado para Tenant {TenantId}", id, tenantId.Value);
+                TempData["ErrorMessage"] = "MarketingPack no encontrado o no tienes permisos para verlo.";
+                return RedirectToAction("Index", "Content");
+            }
+
+            ViewBag.MarketingPack = marketingPack;
+            return View(marketingPack);
         }
         catch (Exception ex)
         {

@@ -38,6 +38,16 @@ public class BaseRepository<T> : IRepository<T> where T : BaseEntity, ITenantEnt
 
     public virtual async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate, Guid tenantId, CancellationToken cancellationToken = default)
     {
+        // Si tenantId es Guid.Empty, no filtrar por tenant (para SuperAdmins)
+        if (tenantId == Guid.Empty)
+        {
+            // Aplicar solo el predicado y filtro de IsActive
+            return await _dbSet
+                .Where(e => e.IsActive)
+                .Where(predicate)
+                .ToListAsync(cancellationToken);
+        }
+        
         // Filtrar por tenant y aplicar el predicado adicional
         return await _dbSet
             .Where(e => e.TenantId == tenantId && e.IsActive)

@@ -3,6 +3,7 @@ using AutonomousMarketingPlatform.Domain.Entities;
 using AutonomousMarketingPlatform.Domain.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 
 namespace AutonomousMarketingPlatform.Application.UseCases.Consents;
 
@@ -24,24 +25,24 @@ public class GrantConsentCommand : IRequest<ConsentDto>
 public class GrantConsentCommandHandler : IRequestHandler<GrantConsentCommand, ConsentDto>
 {
     private readonly IRepository<Consent> _consentRepository;
-    private readonly IRepository<User> _userRepository;
+    private readonly UserManager<ApplicationUser> _userManager;
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     public GrantConsentCommandHandler(
         IRepository<Consent> consentRepository,
-        IRepository<User> userRepository,
+        UserManager<ApplicationUser> userManager,
         IHttpContextAccessor httpContextAccessor)
     {
         _consentRepository = consentRepository;
-        _userRepository = userRepository;
+        _userManager = userManager;
         _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<ConsentDto> Handle(GrantConsentCommand request, CancellationToken cancellationToken)
     {
         // Verificar que el usuario existe y pertenece al tenant
-        var user = await _userRepository.GetByIdAsync(request.UserId, request.TenantId, cancellationToken);
-        if (user == null)
+        var user = await _userManager.FindByIdAsync(request.UserId.ToString());
+        if (user == null || user.TenantId != request.TenantId)
         {
             throw new UnauthorizedAccessException("Usuario no encontrado o no pertenece al tenant.");
         }

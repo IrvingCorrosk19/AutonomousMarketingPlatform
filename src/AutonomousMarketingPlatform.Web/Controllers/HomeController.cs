@@ -24,15 +24,21 @@ public class HomeController : Controller
         try
         {
             var tenantId = UserHelper.GetTenantId(User);
-            if (!tenantId.HasValue)
+            var isSuperAdmin = User.HasClaim("IsSuperAdmin", "true");
+            
+            // Permitir acceso a super admins sin TenantId
+            if (!tenantId.HasValue && !isSuperAdmin)
             {
-                _logger.LogWarning("Usuario autenticado sin TenantId");
+                _logger.LogWarning("Usuario autenticado sin TenantId y no es super admin");
                 return RedirectToAction("Login", "Account");
             }
 
+            // Para super admins, usar Guid.Empty como TenantId
+            var effectiveTenantId = tenantId ?? Guid.Empty;
+
             var query = new GetDashboardDataQuery
             {
-                TenantId = tenantId.Value
+                TenantId = effectiveTenantId
             };
 
             var dashboardData = await _mediator.Send(query);

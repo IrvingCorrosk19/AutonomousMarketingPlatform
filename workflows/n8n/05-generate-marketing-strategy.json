@@ -1,0 +1,306 @@
+{
+  "name": "Generate Marketing Strategy",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-marketing-strategy",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-strategy",
+      "name": "Webhook - Receive Data",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "generate-strategy-webhook",
+      "notes": "Recibe análisis de instrucción y memoria de marketing para generar estrategia"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-analysis",
+              "name": "analysis",
+              "value": "={{ $json.body.analysis || $json.body }}",
+              "type": "object"
+            },
+            {
+              "id": "assign-memory",
+              "name": "memory",
+              "value": "={{ $json.body.memory || {} }}",
+              "type": "object"
+            },
+            {
+              "id": "assign-tenant-id",
+              "name": "tenantId",
+              "value": "={{ $json.body.tenantId || $json.body.analysis?.tenantId || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-data",
+      "name": "Extract Analysis and Memory",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [450, 300],
+      "notes": "Extrae el análisis de instrucción y la memoria de marketing"
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "create",
+        "model": "={{ $env.OPENAI_MODEL || 'gpt-4' }}",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Eres un estratega de marketing experto. Tu tarea es generar una estrategia de marketing completa basada en el análisis de la instrucción del usuario y la memoria histórica del tenant. DEBES responder SOLO con un JSON válido, sin texto adicional, sin markdown, sin explicaciones. El JSON debe tener exactamente esta estructura:\n\n{\n  \"mainMessage\": \"string - mensaje principal de la campaña\",\n  \"cta\": \"string - call to action claro y directo\",\n  \"recommendedFormat\": \"string - formato recomendado (post, story, reel, video, carousel, article)\",\n  \"suggestedSchedule\": {\n    \"bestDays\": [\"string\"],\n    \"bestTimes\": [\"string\"],\n    \"timezone\": \"string\"\n  },\n  \"contentStructure\": {\n    \"headline\": \"string\",\n    \"body\": \"string\",\n    \"hashtags\": [\"string\"],\n    \"mentions\": [\"string\"]\n  },\n  \"channels\": [\"string\"],\n  \"tone\": \"string\",\n  \"targetAudience\": \"string\",\n  \"keyPoints\": [\"string\"]\n}"
+            },
+            {
+              "role": "user",
+              "content": "={{ 'Genera una estrategia de marketing completa basada en la siguiente información:\n\n## Análisis de la Instrucción:\n' + JSON.stringify($json.analysis, null, 2) + '\n\n## Memoria Histórica del Tenant:\n' + JSON.stringify($json.memory, null, 2) + '\n\nConsidera:\n- El objetivo identificado en el análisis\n- El tono recomendado\n- La urgencia\n- Las preferencias históricas del tenant\n- Los canales que mejor funcionan\n- Las restricciones y aprendizajes\n\nResponde SOLO con el JSON de la estrategia, sin texto adicional.' }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 1000
+        },
+        "authentication": "openAiApi"
+      },
+      "id": "openai-strategy",
+      "name": "OpenAI - Generate Strategy",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [650, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-api-credentials",
+          "name": "OpenAI API"
+        }
+      },
+      "notes": "Genera la estrategia de marketing usando OpenAI basándose en análisis y memoria"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parsear la respuesta de OpenAI\nconst response = $input.item.json;\nlet strategy = {};\n\ntry {\n  // Intentar extraer el JSON de la respuesta\n  let content = response.choices?.[0]?.message?.content || response.message?.content || '';\n  \n  // Limpiar el contenido (remover markdown code blocks si existen)\n  content = content.trim();\n  if (content.startsWith('```json')) {\n    content = content.replace(/```json\\s*/g, '').replace(/```\\s*/g, '');\n  } else if (content.startsWith('```')) {\n    content = content.replace(/```\\s*/g, '');\n  }\n  \n  // Parsear el JSON\n  strategy = JSON.parse(content);\n} catch (error) {\n  // Si falla, intentar extraer JSON del texto completo\n  try {\n    const jsonMatch = response.choices?.[0]?.message?.content?.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      strategy = JSON.parse(jsonMatch[0]);\n    } else {\n      // Fallback: crear estructura básica desde el análisis\n      const analysis = $('Extract Analysis and Memory').item.json.analysis || {};\n      strategy = {\n        mainMessage: analysis.objective || 'Mensaje principal de la campaña',\n        cta: 'Descubre más',\n        recommendedFormat: analysis.contentType || 'post',\n        suggestedSchedule: {\n          bestDays: ['lunes', 'miércoles', 'viernes'],\n          bestTimes: ['09:00', '13:00', '18:00'],\n          timezone: 'UTC'\n        },\n        contentStructure: {\n          headline: analysis.objective || '',\n          body: '',\n          hashtags: analysis.hashtags || [],\n          mentions: []\n        },\n        channels: analysis.channels || [],\n        tone: analysis.tone || 'profesional',\n        targetAudience: analysis.targetAudience || '',\n        keyPoints: analysis.keyMessages || []\n      };\n    }\n  } catch (parseError) {\n    // Último fallback\n    const analysis = $('Extract Analysis and Memory').item.json.analysis || {};\n    strategy = {\n      mainMessage: 'Estrategia de marketing',\n      cta: 'Descubre más',\n      recommendedFormat: 'post',\n      suggestedSchedule: {\n        bestDays: ['lunes', 'miércoles', 'viernes'],\n        bestTimes: ['09:00', '13:00', '18:00'],\n        timezone: 'UTC'\n      },\n      contentStructure: {\n        headline: '',\n        body: '',\n        hashtags: [],\n        mentions: []\n      },\n      channels: [],\n      tone: 'profesional',\n      targetAudience: '',\n      keyPoints: []\n    };\n  }\n}\n\n// Asegurar que todos los campos requeridos existan\nconst finalStrategy = {\n  mainMessage: strategy.mainMessage || 'Mensaje principal de la campaña',\n  cta: strategy.cta || 'Descubre más',\n  recommendedFormat: strategy.recommendedFormat || 'post',\n  suggestedSchedule: {\n    bestDays: Array.isArray(strategy.suggestedSchedule?.bestDays) ? strategy.suggestedSchedule.bestDays : ['lunes', 'miércoles', 'viernes'],\n    bestTimes: Array.isArray(strategy.suggestedSchedule?.bestTimes) ? strategy.suggestedSchedule.bestTimes : ['09:00', '13:00', '18:00'],\n    timezone: strategy.suggestedSchedule?.timezone || 'UTC'\n  },\n  contentStructure: {\n    headline: strategy.contentStructure?.headline || '',\n    body: strategy.contentStructure?.body || '',\n    hashtags: Array.isArray(strategy.contentStructure?.hashtags) ? strategy.contentStructure.hashtags : [],\n    mentions: Array.isArray(strategy.contentStructure?.mentions) ? strategy.contentStructure.mentions : []\n  },\n  channels: Array.isArray(strategy.channels) ? strategy.channels : [],\n  tone: strategy.tone || 'profesional',\n  targetAudience: strategy.targetAudience || '',\n  keyPoints: Array.isArray(strategy.keyPoints) ? strategy.keyPoints : []\n};\n\n// Agregar metadatos\nconst metadata = {\n  tenantId: $('Extract Analysis and Memory').item.json.tenantId || '',\n  generatedAt: new Date().toISOString(),\n  basedOnAnalysis: $('Extract Analysis and Memory').item.json.analysis || {},\n  basedOnMemory: $('Extract Analysis and Memory').item.json.memory || {}\n};\n\nreturn {\n  ...finalStrategy,\n  metadata\n};"
+      },
+      "id": "build-strategy",
+      "name": "Build Final Strategy",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300],
+      "notes": "Construye la estrategia final combinando la respuesta de OpenAI con metadatos"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-strategy",
+              "name": "strategy",
+              "value": "={{ $json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "structure-strategy",
+      "name": "Structure Strategy Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [1050, 300],
+      "notes": "Estructura la respuesta final de la estrategia"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Marketing strategy generated successfully\", \"data\": $json.strategy } }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-success",
+      "name": "Respond - Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 300],
+      "notes": "Responde con éxito y la estrategia generada"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"Strategy generation error\", \"message\": \"Failed to generate marketing strategy\", \"details\": { \"error\": $json.error || $json.message || \"Unknown error\" } } }}",
+        "options": {
+          "responseCode": 500,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-error",
+      "name": "Respond - Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [850, 500],
+      "notes": "Responde con error si falla la generación"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-has-response",
+              "leftValue": "={{ $json.choices !== undefined || $json.message !== undefined }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-openai-response",
+      "name": "Check OpenAI Response",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [850, 400],
+      "notes": "Verifica que OpenAI haya respondido correctamente"
+    }
+  ],
+  "connections": {
+    "Webhook - Receive Data": {
+      "main": [
+        [
+          {
+            "node": "Extract Analysis and Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Analysis and Memory": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Generate Strategy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Generate Strategy": {
+      "main": [
+        [
+          {
+            "node": "Check OpenAI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check OpenAI Response": {
+      "main": [
+        [
+          {
+            "node": "Respond - Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Final Strategy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Final Strategy": {
+      "main": [
+        [
+          {
+            "node": "Structure Strategy Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structure Strategy Response": {
+      "main": [
+        [
+          {
+            "node": "Respond - Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z",
+      "id": "marketing-automation",
+      "name": "Marketing Automation"
+    },
+    {
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z",
+      "id": "strategy",
+      "name": "Strategy"
+    },
+    {
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z",
+      "id": "ai-generation",
+      "name": "AI Generation"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2025-01-01T00:00:00.000Z",
+  "versionId": "1"
+}
+

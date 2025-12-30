@@ -1,0 +1,300 @@
+{
+  "name": "Generate Marketing Copy",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-marketing-copy",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-copy",
+      "name": "Webhook - Receive Strategy",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "generate-copy-webhook",
+      "notes": "Recibe la estrategia de marketing para generar el copy"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-strategy",
+              "name": "strategy",
+              "value": "={{ $json.body.strategy || $json.body }}",
+              "type": "object"
+            },
+            {
+              "id": "assign-tenant-id",
+              "name": "tenantId",
+              "value": "={{ $json.body.tenantId || $json.body.strategy?.metadata?.tenantId || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-strategy",
+      "name": "Extract Strategy Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [450, 300],
+      "notes": "Extrae la estrategia y datos necesarios"
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "create",
+        "model": "={{ $env.OPENAI_MODEL || 'gpt-4' }}",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Eres un copywriter experto de marketing digital. Tu tarea es generar copy de marketing listo para publicar en redes sociales. DEBES responder SOLO con un JSON válido, sin texto adicional, sin markdown, sin explicaciones. El JSON debe tener exactamente esta estructura:\n\n{\n  \"shortCopy\": \"string - copy corto (máximo 125 caracteres, ideal para stories o tweets)\",\n  \"longCopy\": \"string - copy largo (máximo 500 caracteres, ideal para posts)\",\n  \"hashtags\": [\"string\"],\n  \"variants\": {\n    \"variantA\": {\n      \"shortCopy\": \"string\",\n      \"longCopy\": \"string\",\n      \"hashtags\": [\"string\"]\n    },\n    \"variantB\": {\n      \"shortCopy\": \"string\",\n      \"longCopy\": \"string\",\n      \"hashtags\": [\"string\"]\n    }\n  },\n  \"headline\": \"string - título llamativo\",\n  \"cta\": \"string - call to action optimizado\",\n  \"emojiSuggestions\": [\"string\"],\n  \"mentions\": [\"string\"]\n}\n\nIMPORTANTE:\n- El copy debe ser directo, atractivo y optimizado para engagement\n- Los hashtags deben ser relevantes y populares\n- Las variantes A/B deben tener enfoques diferentes pero complementarios\n- El copy debe estar listo para publicar sin ediciones"
+            },
+            {
+              "role": "user",
+              "content": "={{ 'Genera copy de marketing listo para publicar basado en la siguiente estrategia:\n\n' + JSON.stringify($json.strategy, null, 2) + '\n\nConsidera:\n- El mensaje principal: ' + ($json.strategy.mainMessage || '') + '\n- El CTA: ' + ($json.strategy.cta || '') + '\n- El tono: ' + ($json.strategy.tone || 'profesional') + '\n- El formato recomendado: ' + ($json.strategy.recommendedFormat || 'post') + '\n- La audiencia objetivo: ' + ($json.strategy.targetAudience || '') + '\n- Los puntos clave: ' + JSON.stringify($json.strategy.keyPoints || []) + '\n- Los canales: ' + JSON.stringify($json.strategy.channels || []) + '\n\nResponde SOLO con el JSON del copy, sin texto adicional.' }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.8,
+          "maxTokens": 1500
+        },
+        "authentication": "openAiApi"
+      },
+      "id": "openai-copy",
+      "name": "OpenAI - Generate Copy",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [650, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-api-credentials",
+          "name": "OpenAI API"
+        }
+      },
+      "notes": "Genera el copy de marketing usando OpenAI basándose en la estrategia"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parsear la respuesta de OpenAI\nconst response = $input.item.json;\nlet copyData = {};\n\ntry {\n  // Intentar extraer el JSON de la respuesta\n  let content = response.choices?.[0]?.message?.content || response.message?.content || '';\n  \n  // Limpiar el contenido (remover markdown code blocks si existen)\n  content = content.trim();\n  if (content.startsWith('```json')) {\n    content = content.replace(/```json\\s*/g, '').replace(/```\\s*/g, '');\n  } else if (content.startsWith('```')) {\n    content = content.replace(/```\\s*/g, '');\n  }\n  \n  // Parsear el JSON\n  copyData = JSON.parse(content);\n} catch (error) {\n  // Si falla, intentar extraer JSON del texto completo\n  try {\n    const jsonMatch = response.choices?.[0]?.message?.content?.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      copyData = JSON.parse(jsonMatch[0]);\n    } else {\n      // Fallback: crear estructura básica desde la estrategia\n      const strategy = $('Extract Strategy Data').item.json.strategy || {};\n      copyData = {\n        shortCopy: strategy.mainMessage || 'Descubre más',\n        longCopy: (strategy.contentStructure?.body || strategy.mainMessage || '') + '\\n\\n' + (strategy.cta || ''),\n        hashtags: strategy.contentStructure?.hashtags || strategy.keyPoints || [],\n        variants: {\n          variantA: {\n            shortCopy: strategy.mainMessage || 'Descubre más',\n            longCopy: (strategy.contentStructure?.body || strategy.mainMessage || '') + '\\n\\n' + (strategy.cta || ''),\n            hashtags: strategy.contentStructure?.hashtags || []\n          },\n          variantB: {\n            shortCopy: strategy.mainMessage || 'Explora ahora',\n            longCopy: (strategy.contentStructure?.body || strategy.mainMessage || '') + '\\n\\n' + (strategy.cta || ''),\n            hashtags: strategy.contentStructure?.hashtags || []\n          }\n        },\n        headline: strategy.contentStructure?.headline || strategy.mainMessage || '',\n        cta: strategy.cta || 'Descubre más',\n        emojiSuggestions: [],\n        mentions: strategy.contentStructure?.mentions || []\n      };\n    }\n  } catch (parseError) {\n    // Último fallback\n    const strategy = $('Extract Strategy Data').item.json.strategy || {};\n    copyData = {\n      shortCopy: 'Copy corto',\n      longCopy: 'Copy largo',\n      hashtags: [],\n      variants: {\n        variantA: { shortCopy: '', longCopy: '', hashtags: [] },\n        variantB: { shortCopy: '', longCopy: '', hashtags: [] }\n      },\n      headline: '',\n      cta: '',\n      emojiSuggestions: [],\n      mentions: []\n    };\n  }\n}\n\n// Asegurar que todos los campos requeridos existan y estén estructurados correctamente\nconst finalCopy = {\n  shortCopy: copyData.shortCopy || 'Copy corto',\n  longCopy: copyData.longCopy || 'Copy largo',\n  hashtags: Array.isArray(copyData.hashtags) ? copyData.hashtags : [],\n  variants: {\n    variantA: {\n      shortCopy: copyData.variants?.variantA?.shortCopy || copyData.shortCopy || 'Variante A - Copy corto',\n      longCopy: copyData.variants?.variantA?.longCopy || copyData.longCopy || 'Variante A - Copy largo',\n      hashtags: Array.isArray(copyData.variants?.variantA?.hashtags) ? copyData.variants.variantA.hashtags : (copyData.hashtags || [])\n    },\n    variantB: {\n      shortCopy: copyData.variants?.variantB?.shortCopy || copyData.shortCopy || 'Variante B - Copy corto',\n      longCopy: copyData.variants?.variantB?.longCopy || copyData.longCopy || 'Variante B - Copy largo',\n      hashtags: Array.isArray(copyData.variants?.variantB?.hashtags) ? copyData.variants.variantB.hashtags : (copyData.hashtags || [])\n    }\n  },\n  headline: copyData.headline || '',\n  cta: copyData.cta || 'Descubre más',\n  emojiSuggestions: Array.isArray(copyData.emojiSuggestions) ? copyData.emojiSuggestions : [],\n  mentions: Array.isArray(copyData.mentions) ? copyData.mentions : []\n};\n\n// Agregar metadatos y formato para publicación\nconst strategy = $('Extract Strategy Data').item.json.strategy || {};\nconst publishReady = {\n  ...finalCopy,\n  // Formato listo para publicar\n  publishFormat: {\n    instagram: {\n      caption: finalCopy.longCopy + '\\n\\n' + finalCopy.hashtags.map(h => '#' + h.replace(/^#/, '')).join(' '),\n      storyText: finalCopy.shortCopy,\n      hashtags: finalCopy.hashtags\n    },\n    facebook: {\n      post: finalCopy.longCopy,\n      hashtags: finalCopy.hashtags\n    },\n    twitter: {\n      tweet: finalCopy.shortCopy,\n      thread: finalCopy.longCopy,\n      hashtags: finalCopy.hashtags\n    }\n  },\n  metadata: {\n    tenantId: $('Extract Strategy Data').item.json.tenantId || '',\n    generatedAt: new Date().toISOString(),\n    format: strategy.recommendedFormat || 'post',\n    channels: strategy.channels || [],\n    tone: strategy.tone || 'profesional'\n  }\n};\n\nreturn publishReady;"
+      },
+      "id": "build-copy",
+      "name": "Build Publish-Ready Copy",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300],
+      "notes": "Construye el copy listo para publicar con formatos específicos por canal"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-copy",
+              "name": "copy",
+              "value": "={{ $json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "structure-copy",
+      "name": "Structure Copy Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [1050, 300],
+      "notes": "Estructura la respuesta final del copy"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Marketing copy generated successfully\", \"data\": $json.copy } }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-success",
+      "name": "Respond - Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 300],
+      "notes": "Responde con éxito y el copy generado listo para publicar"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"Copy generation error\", \"message\": \"Failed to generate marketing copy\", \"details\": { \"error\": $json.error || $json.message || \"Unknown error\" } } }}",
+        "options": {
+          "responseCode": 500,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-error",
+      "name": "Respond - Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [850, 500],
+      "notes": "Responde con error si falla la generación"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-has-response",
+              "leftValue": "={{ $json.choices !== undefined || $json.message !== undefined }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-openai-response",
+      "name": "Check OpenAI Response",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [850, 400],
+      "notes": "Verifica que OpenAI haya respondido correctamente"
+    }
+  ],
+  "connections": {
+    "Webhook - Receive Strategy": {
+      "main": [
+        [
+          {
+            "node": "Extract Strategy Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Strategy Data": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Generate Copy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Generate Copy": {
+      "main": [
+        [
+          {
+            "node": "Check OpenAI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check OpenAI Response": {
+      "main": [
+        [
+          {
+            "node": "Respond - Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Publish-Ready Copy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Publish-Ready Copy": {
+      "main": [
+        [
+          {
+            "node": "Structure Copy Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structure Copy Response": {
+      "main": [
+        [
+          {
+            "node": "Respond - Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z",
+      "id": "marketing-automation",
+      "name": "Marketing Automation"
+    },
+    {
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z",
+      "id": "copy-generation",
+      "name": "Copy Generation"
+    },
+    {
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z",
+      "id": "ai-generation",
+      "name": "AI Generation"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2025-01-01T00:00:00.000Z",
+  "versionId": "1"
+}
+

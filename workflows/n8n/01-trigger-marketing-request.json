@@ -1,0 +1,223 @@
+{
+  "name": "Trigger - Marketing Request",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "marketing-request",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook - Receive Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "marketing-request-webhook",
+      "notes": "Recibe solicitudes POST del backend con los datos de la solicitud de marketing"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-tenantId",
+              "leftValue": "={{ $json.body.tenantId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "condition-userId",
+              "leftValue": "={{ $json.body.userId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "condition-instruction",
+              "leftValue": "={{ $json.body.instruction }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "condition-channels",
+              "leftValue": "={{ $json.body.channels }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "condition-requiresApproval",
+              "leftValue": "={{ String($json.body.requiresApproval) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "validate-fields",
+      "name": "Validate Required Fields",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "notes": "Valida que todos los campos requeridos estén presentes y no vacíos en el payload"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"error\": \"Missing required fields\", \"message\": \"The request must include: tenantId, userId, instruction, channels, and requiresApproval\", \"received\": { \"tenantId\": $json.body.tenantId ? \"present\" : \"missing\", \"userId\": $json.body.userId ? \"present\" : \"missing\", \"instruction\": $json.body.instruction ? \"present\" : \"missing\", \"channels\": $json.body.channels ? \"present\" : \"missing\", \"requiresApproval\": $json.body.requiresApproval !== undefined ? \"present\" : \"missing\" } } }}",
+        "options": {
+          "responseCode": 400,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-error",
+      "name": "Respond - Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [650, 200],
+      "notes": "Responde con error 400 si faltan campos requeridos"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Request validated successfully\", \"data\": { \"tenantId\": $json.body.tenantId, \"userId\": $json.body.userId, \"campaignId\": $json.body.campaignId || null, \"instruction\": $json.body.instruction, \"assets\": $json.body.assets || [], \"channels\": $json.body.channels, \"requiresApproval\": $json.body.requiresApproval, \"timestamp\": $now } } }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-success",
+      "name": "Respond - Validation Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [650, 400],
+      "notes": "Responde con éxito 200 si la validación es correcta y continúa el flujo"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-validated-data",
+              "name": "validatedData",
+              "value": "={{ { \"tenantId\": $json.body.tenantId, \"userId\": $json.body.userId, \"campaignId\": $json.body.campaignId || null, \"instruction\": $json.body.instruction, \"assets\": $json.body.assets || [], \"channels\": $json.body.channels, \"requiresApproval\": $json.body.requiresApproval, \"receivedAt\": $now, \"requestId\": $execution.id } }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-validated-data",
+      "name": "Set Validated Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [850, 400],
+      "notes": "Prepara los datos validados para el siguiente paso del flujo"
+    }
+  ],
+  "connections": {
+    "Webhook - Receive Request": {
+      "main": [
+        [
+          {
+            "node": "Validate Required Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Required Fields": {
+      "main": [
+        [
+          {
+            "node": "Respond - Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond - Validation Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond - Validation Success": {
+      "main": [
+        [
+          {
+            "node": "Set Validated Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z",
+      "id": "marketing-automation",
+      "name": "Marketing Automation"
+    },
+    {
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z",
+      "id": "trigger",
+      "name": "Trigger"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2025-01-01T00:00:00.000Z",
+  "versionId": "1"
+}
+

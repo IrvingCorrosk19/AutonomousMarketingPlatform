@@ -3,6 +3,7 @@ using AutonomousMarketingPlatform.Application.UseCases.Auth;
 using AutonomousMarketingPlatform.Infrastructure.Services;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -41,19 +42,24 @@ public class AccountController : Controller
     [AllowAnonymous]
     public async Task<IActionResult> Login(string? returnUrl = null)
     {
-        // Si ya está autenticado, redirigir al dashboard
-        if (User.Identity?.IsAuthenticated == true)
-        {
-            return RedirectToAction("Index", "Home");
-        }
-
+        // NO redirigir aquí - esto causa loops de redirección
+        // La redirección solo debe ocurrir en el POST después de login exitoso
+        
         ViewData["ReturnUrl"] = returnUrl;
         
         // Intentar obtener tenant del request
         var tenantId = await _tenantResolver.ResolveTenantIdAsync();
         ViewData["TenantId"] = tenantId;
 
-        return View();
+        // Crear modelo con valores por defecto para desarrollo
+        var model = new LoginDto();
+        if (HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().IsDevelopment())
+        {
+            model.Email = "admin@test.com";
+            model.Password = "Admin123!";
+        }
+
+        return View(model);
     }
 
     /// <summary>
@@ -62,21 +68,95 @@ public class AccountController : Controller
     [HttpPost]
     [AllowAnonymous]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Login(LoginDto model, string? returnUrl = null)
+    public async Task<IActionResult> Login([FromForm] LoginDto model, [FromQuery] string? returnUrl = null)
     {
         ViewData["ReturnUrl"] = returnUrl;
+
+        // Debug: Log de lo que está llegando
+        _logger.LogWarning("Login POST recibido - Email: '{Email}', Password: '{Password}', Model null: {IsNull}", 
+            model?.Email ?? "NULL", 
+            string.IsNullOrEmpty(model?.Password) ? "EMPTY" : "***", 
+            model == null);
+
+        // Si el modelo es null, intentar leer desde Request.Form
+        if (model == null)
+        {
+            _logger.LogWarning("Model es null, intentando leer desde Request.Form");
+            model = new LoginDto
+            {
+                Email = Request.Form["Email"].ToString(),
+                Password = Request.Form["Password"].ToString(),
+                RememberMe = Request.Form["RememberMe"].ToString() == "true"
+            };
+            _logger.LogWarning("Valores desde Request.Form - Email: '{Email}', Password: '{Password}'", 
+                model.Email, string.IsNullOrEmpty(model.Password) ? "EMPTY" : "***");
+        }
+
+        // Validar que el email y password no estén vacíos
+        if (string.IsNullOrWhiteSpace(model?.Email))
+        {
+            ModelState.AddModelError(string.Empty, "El correo electrónico es requerido.");
+            return View(model ?? new LoginDto());
+        }
+
+        if (string.IsNullOrWhiteSpace(model?.Password))
+        {
+            ModelState.AddModelError(string.Empty, "La contraseña es requerida.");
+            return View(model ?? new LoginDto());
+        }
 
         if (!ModelState.IsValid)
         {
             return View(model);
         }
 
-        // Resolver tenant
-        var tenantId = await _tenantResolver.ResolveTenantIdAsync();
-        if (!tenantId.HasValue)
+        // Resolver tenant (opcional para super admin)
+        var tenantIdNullable = await _tenantResolver.ResolveTenantIdAsync();
+        Guid tenantId;
+        Domain.Entities.ApplicationUser? user = null;
+        
+        // Si no hay tenant resuelto desde el request, intentar obtenerlo del usuario
+        if (!tenantIdNullable.HasValue)
         {
-            ModelState.AddModelError(string.Empty, "No se pudo determinar el tenant. Por favor, use el header X-Tenant-Id o acceda desde el subdominio correcto.");
-            return View(model);
+            // Intentar encontrar el usuario para obtener su TenantId
+            user = await _userManager.FindByEmailAsync(model.Email);
+            if (user != null)
+            {
+                // Si el usuario tiene un TenantId válido, usarlo
+                if (user.TenantId != Guid.Empty)
+                {
+                    tenantId = user.TenantId;
+                }
+                else
+                {
+                    // Usuario con TenantId = Guid.Empty es super admin
+                    var roles = await _userManager.GetRolesAsync(user);
+                    var isSuperAdmin = roles.Contains("SuperAdmin") || roles.Contains("Owner");
+                    
+                    if (isSuperAdmin)
+                    {
+                        // Para super admin, usar Guid.Empty como TenantId temporal
+                        tenantId = Guid.Empty;
+                    }
+                    else
+                    {
+                        // Usuario sin tenant y no es super admin
+                        ModelState.AddModelError(string.Empty, "No se pudo determinar el tenant. Por favor, use el header X-Tenant-Id o acceda desde el subdominio correcto.");
+                        return View(model);
+                    }
+                }
+            }
+            else
+            {
+                // Usuario no existe todavía, permitir intento de login
+                // El LoginCommand validará las credenciales
+                // Usar Guid.Empty temporalmente para permitir la validación
+                tenantId = Guid.Empty;
+            }
+        }
+        else
+        {
+            tenantId = tenantIdNullable.Value;
         }
 
         // Ejecutar comando de login
@@ -84,7 +164,7 @@ public class AccountController : Controller
         {
             Email = model.Email,
             Password = model.Password,
-            TenantId = tenantId.Value,
+            TenantId = tenantId,
             RememberMe = model.RememberMe,
             IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
         };
@@ -94,32 +174,116 @@ public class AccountController : Controller
         if (result.Success)
         {
             // Obtener usuario para agregar claims
-            var user = await _userManager.FindByEmailAsync(model.Email);
+            if (user == null)
+            {
+                user = await _userManager.FindByEmailAsync(model.Email);
+            }
+            
             if (user != null)
             {
-                // Agregar claim de TenantId
+                // Agregar claims
                 var claims = new List<Claim>
                 {
-                    new Claim("TenantId", tenantId.Value.ToString()),
                     new Claim("FullName", user.FullName ?? user.Email ?? "")
                 };
-
-                // Agregar claims de roles para este tenant
-                var roles = await _userManager.GetRolesAsync(user);
-                foreach (var role in roles)
+                
+                // Agregar TenantId siempre (incluso si es Guid.Empty para super admin)
+                claims.Add(new Claim("TenantId", tenantId.ToString()));
+                
+                // Si es super admin (tenantId == Guid.Empty), marcar como tal
+                if (tenantId == Guid.Empty)
                 {
-                    claims.Add(new Claim(ClaimTypes.Role, role));
+                    claims.Add(new Claim("IsSuperAdmin", "true"));
                 }
 
+                // NO agregar claims de roles manualmente - Identity los maneja automáticamente
+                // Los roles se incluyen automáticamente en los claims del usuario por Identity
+
                 // Agregar claims adicionales al usuario
+                _logger.LogInformation("=== INICIO LOGIN EXITOSO ===");
+                _logger.LogInformation("Usuario: {Email}, UserId: {UserId}", user.Email, user.Id);
+                _logger.LogInformation("TenantId del request: {TenantId}", tenantId);
+                _logger.LogInformation("User.TenantId en DB: {UserTenantId}", user.TenantId);
+                _logger.LogInformation("Es SuperAdmin: {IsSuperAdmin}", tenantId == Guid.Empty);
+                
+                // Obtener claims existentes
+                var existingClaims = await _userManager.GetClaimsAsync(user);
+                _logger.LogInformation("Claims existentes: {ExistingClaimsCount}", existingClaims.Count);
+                
+                // Remover claims personalizados duplicados (FullName, TenantId, IsSuperAdmin)
+                // También remover claims de roles duplicados (Identity los maneja automáticamente desde AspNetUserRoles)
+                var customClaimTypes = new[] { "FullName", "TenantId", "IsSuperAdmin" };
+                var customClaimsToRemove = existingClaims.Where(c => customClaimTypes.Contains(c.Type)).ToList();
+                
+                // Remover claims de roles duplicados (Identity los genera automáticamente desde AspNetUserRoles)
+                var roleClaimsToRemove = existingClaims.Where(c => c.Type == ClaimTypes.Role).ToList();
+                
+                if (customClaimsToRemove.Any() || roleClaimsToRemove.Any())
+                {
+                    var totalToRemove = customClaimsToRemove.Count + roleClaimsToRemove.Count;
+                    _logger.LogInformation("Removiendo {Count} claims duplicados ({CustomCount} personalizados, {RoleCount} roles)", 
+                        totalToRemove, customClaimsToRemove.Count, roleClaimsToRemove.Count);
+                    
+                    foreach (var claim in customClaimsToRemove)
+                    {
+                        await _userManager.RemoveClaimAsync(user, claim);
+                    }
+                    
+                    foreach (var claim in roleClaimsToRemove)
+                    {
+                        await _userManager.RemoveClaimAsync(user, claim);
+                    }
+                    
+                    _logger.LogInformation("Claims duplicados removidos exitosamente");
+                }
+                
+                // Agregar los claims limpios
+                _logger.LogInformation("Claims a agregar: {ClaimsCount}", claims.Count);
+                foreach (var claim in claims)
+                {
+                    _logger.LogInformation("  - Claim: {Type} = {Value}", claim.Type, claim.Value);
+                }
+                
                 await _userManager.AddClaimsAsync(user, claims);
+                _logger.LogInformation("Claims agregados exitosamente");
                 
                 await _signInManager.SignInAsync(user, model.RememberMe);
+                _logger.LogInformation("SignIn completado, RememberMe: {RememberMe}", model.RememberMe);
                 
-                _logger.LogInformation("Login exitoso: UserId={UserId}, Email={Email}, TenantId={TenantId}",
-                    user.Id, user.Email, tenantId);
+                // Verificar claims después del sign in
+                var userAfterSignIn = await _signInManager.UserManager.GetUserAsync(User);
+                if (userAfterSignIn != null)
+                {
+                    var claimsAfterSignIn = await _signInManager.UserManager.GetClaimsAsync(userAfterSignIn);
+                    _logger.LogInformation("Claims después del SignIn: {ClaimsCount}", claimsAfterSignIn.Count);
+                    foreach (var claim in claimsAfterSignIn)
+                    {
+                        _logger.LogInformation("  - Claim: {Type} = {Value}", claim.Type, claim.Value);
+                    }
+                }
+                
+                _logger.LogInformation("RedirectToLocal con returnUrl: {ReturnUrl}", returnUrl ?? "null");
+                _logger.LogInformation("=== FIN LOGIN EXITOSO ===");
 
-                return RedirectToLocal(returnUrl);
+                // Redirección inteligente según rol y returnUrl
+                if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+                {
+                    _logger.LogInformation("Redirigiendo a returnUrl: {ReturnUrl}", returnUrl);
+                    return Redirect(returnUrl);
+                }
+
+                // Fallback: Redirigir según rol del usuario
+                var isSuperAdmin = tenantId == Guid.Empty;
+                if (isSuperAdmin)
+                {
+                    _logger.LogInformation("Redirigiendo SuperAdmin a Home/Index");
+                    return RedirectToAction("Index", "Home");
+                }
+                else
+                {
+                    _logger.LogInformation("Redirigiendo usuario normal a Home/Index");
+                    return RedirectToAction("Index", "Home");
+                }
             }
         }
 

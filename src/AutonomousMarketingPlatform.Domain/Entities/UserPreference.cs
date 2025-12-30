@@ -1,4 +1,5 @@
 using AutonomousMarketingPlatform.Domain.Common;
+using Microsoft.AspNetCore.Identity;
 
 namespace AutonomousMarketingPlatform.Domain.Entities;
 
@@ -39,6 +40,6 @@ public class UserPreference : BaseEntity, ITenantEntity
     public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
 
     // Navigation properties
-    public virtual User User { get; set; } = null!;
+    public virtual ApplicationUser User { get; set; } = null!;
 }
 

@@ -44,7 +44,8 @@ public class Tenant : BaseEntity
     public DateTime? SubscriptionEndDate { get; set; }
 
     // Navigation properties
-    public virtual ICollection<User> Users { get; set; } = new List<User>();
+    // Nota: Users ahora se maneja a través de ApplicationUser (Identity)
+    // public virtual ICollection<User> Users { get; set; } = new List<User>();
     public virtual ICollection<Campaign> Campaigns { get; set; } = new List<Campaign>();
 }
 

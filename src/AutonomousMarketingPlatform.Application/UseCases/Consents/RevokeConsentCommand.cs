@@ -2,6 +2,7 @@ using AutonomousMarketingPlatform.Application.DTOs;
 using AutonomousMarketingPlatform.Domain.Entities;
 using AutonomousMarketingPlatform.Domain.Interfaces;
 using MediatR;
+using Microsoft.AspNetCore.Identity;
 
 namespace AutonomousMarketingPlatform.Application.UseCases.Consents;
 
@@ -21,21 +22,21 @@ public class RevokeConsentCommand : IRequest<ConsentDto>
 public class RevokeConsentCommandHandler : IRequestHandler<RevokeConsentCommand, ConsentDto>
 {
     private readonly IRepository<Consent> _consentRepository;
-    private readonly IRepository<User> _userRepository;
+    private readonly UserManager<ApplicationUser> _userManager;
 
     public RevokeConsentCommandHandler(
         IRepository<Consent> consentRepository,
-        IRepository<User> userRepository)
+        UserManager<ApplicationUser> userManager)
     {
         _consentRepository = consentRepository;
-        _userRepository = userRepository;
+        _userManager = userManager;
     }
 
     public async Task<ConsentDto> Handle(RevokeConsentCommand request, CancellationToken cancellationToken)
     {
         // Verificar que el usuario existe
-        var user = await _userRepository.GetByIdAsync(request.UserId, request.TenantId, cancellationToken);
-        if (user == null)
+        var user = await _userManager.FindByIdAsync(request.UserId.ToString());
+        if (user == null || user.TenantId != request.TenantId)
         {
             throw new UnauthorizedAccessException("Usuario no encontrado o no pertenece al tenant.");
         }

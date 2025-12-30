@@ -1,6 +1,7 @@
 using AutonomousMarketingPlatform.Application.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using System.Security.Claims;
 
 namespace AutonomousMarketingPlatform.Web.Middleware;
 
@@ -10,27 +11,47 @@ namespace AutonomousMarketingPlatform.Web.Middleware;
 public class TenantValidationMiddleware
 {
     private readonly RequestDelegate _next;
-    private readonly ISecurityService _securityService;
     private readonly ILogger<TenantValidationMiddleware> _logger;
     private readonly bool _validationEnabled;
 
     public TenantValidationMiddleware(
         RequestDelegate next,
-        ISecurityService securityService,
         ILogger<TenantValidationMiddleware> logger,
         IConfiguration configuration)
     {
         _next = next;
-        _securityService = securityService;
         _logger = logger;
         _validationEnabled = configuration.GetValue<bool>("MultiTenant:ValidationEnabled", true);
     }
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // Skip validation para health checks, endpoints públicos y login
+        // Skip validation para health checks, endpoints públicos, login y archivos estáticos
         var path = context.Request.Path.Value?.ToLower() ?? "";
-        if (path.StartsWith("/health") || 
+        
+        // Excluir archivos estáticos (CSS, JS, imágenes, fuentes, etc.)
+        var isStaticFile = path.StartsWith("/css/") ||
+                          path.StartsWith("/js/") ||
+                          path.StartsWith("/images/") ||
+                          path.StartsWith("/img/") ||
+                          path.StartsWith("/fonts/") ||
+                          path.StartsWith("/lib/") ||
+                          path.StartsWith("/favicon.ico") ||
+                          path.EndsWith(".css") ||
+                          path.EndsWith(".js") ||
+                          path.EndsWith(".png") ||
+                          path.EndsWith(".jpg") ||
+                          path.EndsWith(".jpeg") ||
+                          path.EndsWith(".gif") ||
+                          path.EndsWith(".svg") ||
+                          path.EndsWith(".ico") ||
+                          path.EndsWith(".woff") ||
+                          path.EndsWith(".woff2") ||
+                          path.EndsWith(".ttf") ||
+                          path.EndsWith(".eot");
+        
+        if (isStaticFile ||
+            path.StartsWith("/health") || 
             path.StartsWith("/api/public") || 
             path.StartsWith("/account/login") ||
             path.StartsWith("/account/accessdenied"))
@@ -69,7 +90,17 @@ public class TenantValidationMiddleware
                     return;
                 }
 
-                _logger.LogWarning("Request sin TenantId: Path={Path}, IP={IP}",
+                // Si está autenticado, verificar si es super admin
+                var isSuperAdmin = context.User.HasClaim("IsSuperAdmin", "true");
+                if (isSuperAdmin)
+                {
+                    // Super admin puede acceder sin tenant
+                    _logger.LogInformation("SuperAdmin accediendo sin TenantId: Path={Path}", context.Request.Path);
+                    await _next(context);
+                    return;
+                }
+
+                _logger.LogWarning("Request sin TenantId y no es super admin: Path={Path}, IP={IP}",
                     context.Request.Path, context.Connection.RemoteIpAddress);
 
                 context.Response.StatusCode = 400;
@@ -84,8 +115,11 @@ public class TenantValidationMiddleware
                 return;
             }
 
+            // Resolver ISecurityService desde el scope del request (no desde constructor)
+            var securityService = context.RequestServices.GetRequiredService<ISecurityService>();
+            
             // Validar que el tenant existe y está activo
-            var isValid = await _securityService.ValidateTenantAsync(tenantId.Value);
+            var isValid = await securityService.ValidateTenantAsync(tenantId.Value);
             if (!isValid)
             {
                 _logger.LogWarning("Intento de acceso con tenant inválido: TenantId={TenantId}, Path={Path}, IP={IP}",

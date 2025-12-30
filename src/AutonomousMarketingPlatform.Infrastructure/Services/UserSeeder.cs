@@ -76,24 +76,34 @@ public class UserSeeder
                 return null;
             }
 
-            // Asignar rol
+            // Asignar rol (si no lo tiene ya)
             var role = await _roleManager.FindByNameAsync(roleName);
             if (role != null)
             {
-                await _userManager.AddToRoleAsync(user, roleName);
-                
-                // Crear relación UserTenant
-                var userTenant = new UserTenant
+                var userRoles = await _userManager.GetRolesAsync(user);
+                if (!userRoles.Contains(roleName))
                 {
-                    UserId = user.Id,
-                    TenantId = tenantId,
-                    RoleId = role.Id,
-                    IsPrimary = true,
-                    JoinedAt = DateTime.UtcNow
-                };
+                    await _userManager.AddToRoleAsync(user, roleName);
+                }
+                
+                // Crear relación UserTenant solo si no existe
+                var existingUserTenant = await context.UserTenants
+                    .FirstOrDefaultAsync(ut => ut.UserId == user.Id && ut.TenantId == tenantId);
+                
+                if (existingUserTenant == null)
+                {
+                    var userTenant = new UserTenant
+                    {
+                        UserId = user.Id,
+                        TenantId = tenantId,
+                        RoleId = role.Id,
+                        IsPrimary = true,
+                        JoinedAt = DateTime.UtcNow
+                    };
 
-                context.UserTenants.Add(userTenant);
-                await context.SaveChangesAsync();
+                    context.UserTenants.Add(userTenant);
+                    await context.SaveChangesAsync();
+                }
             }
 
             _logger.LogInformation("Usuario creado exitosamente: {Email}, Tenant: {TenantId}, Rol: {Role}", 

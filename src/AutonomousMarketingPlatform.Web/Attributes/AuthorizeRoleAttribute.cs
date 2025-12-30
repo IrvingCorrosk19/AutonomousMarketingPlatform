@@ -27,6 +27,15 @@ public class AuthorizeRoleAttribute : Attribute, IAuthorizationFilter
             return;
         }
 
+        // Verificar si el usuario tiene el claim IsSuperAdmin
+        var isSuperAdmin = user.HasClaim("IsSuperAdmin", "true");
+        
+        // Si es SuperAdmin, permitir acceso
+        if (isSuperAdmin && _allowedRoles.Contains("SuperAdmin"))
+        {
+            return;
+        }
+
         // Verificar si el usuario tiene alguno de los roles permitidos
         var hasRole = _allowedRoles.Any(role => user.IsInRole(role));
 
