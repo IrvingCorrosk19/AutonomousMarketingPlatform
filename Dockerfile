@@ -2,22 +2,22 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Copy solution and project files
-COPY *.sln .
+# Copy project files first (for better layer caching)
 COPY src/AutonomousMarketingPlatform.Domain/AutonomousMarketingPlatform.Domain.csproj src/AutonomousMarketingPlatform.Domain/
 COPY src/AutonomousMarketingPlatform.Application/AutonomousMarketingPlatform.Application.csproj src/AutonomousMarketingPlatform.Application/
 COPY src/AutonomousMarketingPlatform.Infrastructure/AutonomousMarketingPlatform.Infrastructure.csproj src/AutonomousMarketingPlatform.Infrastructure/
 COPY src/AutonomousMarketingPlatform.Web/AutonomousMarketingPlatform.Web.csproj src/AutonomousMarketingPlatform.Web/
 
-# Restore dependencies
-RUN dotnet restore
+# Restore dependencies for the Web project only
+WORKDIR /src/src/AutonomousMarketingPlatform.Web
+RUN dotnet restore AutonomousMarketingPlatform.Web.csproj
 
 # Copy everything else
 COPY . .
 
-# Build and publish
+# Build and publish the Web project only
 WORKDIR /src/src/AutonomousMarketingPlatform.Web
-RUN dotnet publish -c Release -o /app/publish
+RUN dotnet publish AutonomousMarketingPlatform.Web.csproj -c Release -o /app/publish
 
 # Stage 2: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
