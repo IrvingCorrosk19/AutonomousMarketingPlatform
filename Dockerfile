@@ -1,37 +1,34 @@
-# Stage 1: Build
+# =========================
+# BUILD STAGE
+# =========================
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Copy project files first (for better layer caching)
-COPY src/AutonomousMarketingPlatform.Domain/AutonomousMarketingPlatform.Domain.csproj src/AutonomousMarketingPlatform.Domain/
-COPY src/AutonomousMarketingPlatform.Application/AutonomousMarketingPlatform.Application.csproj src/AutonomousMarketingPlatform.Application/
-COPY src/AutonomousMarketingPlatform.Infrastructure/AutonomousMarketingPlatform.Infrastructure.csproj src/AutonomousMarketingPlatform.Infrastructure/
-COPY src/AutonomousMarketingPlatform.Web/AutonomousMarketingPlatform.Web.csproj src/AutonomousMarketingPlatform.Web/
+# Copiamos SOLO el código fuente (NO la solution)
+COPY src/ ./src/
 
-# Restore dependencies for the Web project only
-WORKDIR /src/src/AutonomousMarketingPlatform.Web
-RUN dotnet restore AutonomousMarketingPlatform.Web.csproj
+# Restauramos ÚNICAMENTE el proyecto Web
+RUN dotnet restore src/AutonomousMarketingPlatform.Web/AutonomousMarketingPlatform.Web.csproj
 
-# Copy everything else
-COPY . .
+# Publicamos el proyecto Web
+RUN dotnet publish src/AutonomousMarketingPlatform.Web/AutonomousMarketingPlatform.Web.csproj \
+    -c Release \
+    -o /app/publish \
+    /p:UseAppHost=false
 
-# Build and publish the Web project only
-WORKDIR /src/src/AutonomousMarketingPlatform.Web
-RUN dotnet publish AutonomousMarketingPlatform.Web.csproj -c Release -o /app/publish
-
-# Stage 2: Runtime
+# =========================
+# RUNTIME STAGE
+# =========================
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 
-# Copy published app
+# Copiamos SOLO el resultado publicado
 COPY --from=build /app/publish .
 
-# Expose port (Render will set PORT env var dynamically)
+# Render define el puerto dinámicamente
+# La variable PORT se inyecta en runtime, no en build time
+ENV ASPNETCORE_ENVIRONMENT=Production
 EXPOSE 8080
 
-# Set environment variables
-ENV ASPNETCORE_ENVIRONMENT=Production
-ENV ASPNETCORE_URLS=http://0.0.0.0:8080
-
-# Run the app
 ENTRYPOINT ["dotnet", "AutonomousMarketingPlatform.Web.dll"]
+
