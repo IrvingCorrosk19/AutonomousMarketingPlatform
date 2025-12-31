@@ -16,13 +16,8 @@ RUN dotnet restore
 COPY . .
 WORKDIR /src/src/AutonomousMarketingPlatform.Web
 
-# Copiar explícitamente Views y wwwroot al build stage para asegurar que estén disponibles
-# Esto es necesario porque COPY . . puede no copiar correctamente estas carpetas
-COPY src/AutonomousMarketingPlatform.Web/Views ./Views
-COPY src/AutonomousMarketingPlatform.Web/wwwroot ./wwwroot
-
 # Asegurar que las vistas Razor se incluyan explícitamente en el publish
-# Las vistas deben estar disponibles en tiempo de ejecución
+# El SDK incluye automáticamente Views y wwwroot, pero aseguramos que se copien
 RUN dotnet publish AutonomousMarketingPlatform.Web.csproj -c Release -o /app/publish --no-restore \
     /p:CopyRazorGenerateFilesToPublishDirectory=true \
     /p:CopyRefAssembliesToPublishDirectory=false
@@ -31,13 +26,9 @@ RUN dotnet publish AutonomousMarketingPlatform.Web.csproj -c Release -o /app/pub
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 
-# Copy published app (esto incluye DLLs, configs, etc.)
+# Copy published app (esto incluye DLLs, configs, Views, wwwroot, etc.)
+# El SDK de .NET incluye automáticamente Views y wwwroot en el publish
 COPY --from=build /app/publish .
-
-# Copiar explícitamente Views y wwwroot desde el build stage
-# Las rutas son relativas al WORKDIR del build stage: /src/src/AutonomousMarketingPlatform.Web
-COPY --from=build /src/src/AutonomousMarketingPlatform.Web/Views ./Views
-COPY --from=build /src/src/AutonomousMarketingPlatform.Web/wwwroot ./wwwroot
 
 # Expose port (Render will set PORT env var dynamically)
 EXPOSE 8080
