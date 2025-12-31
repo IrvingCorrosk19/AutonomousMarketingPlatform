@@ -40,7 +40,7 @@
           "parameters": [
             { "name": "tenantId", "value": "={{ $json.tenantId }}" },
             { "name": "userId", "value": "={{ $json.userId }}" }
-          ]
+          ]g
         },
         "options": { "timeout": 10000 }
       }
