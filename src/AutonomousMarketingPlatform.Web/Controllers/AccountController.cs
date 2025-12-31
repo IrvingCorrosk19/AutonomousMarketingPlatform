@@ -44,6 +44,7 @@ public class AccountController : Controller
     {
         try
         {
+            Console.WriteLine($"[AccountController] Login GET iniciado - Path={HttpContext.Request.Path}, ReturnUrl={returnUrl}");
             _logger.LogInformation("=== AccountController.Login (GET) iniciado ===");
             _logger.LogInformation("ReturnUrl: {ReturnUrl}, Path: {Path}", returnUrl, HttpContext.Request.Path);
             
@@ -53,17 +54,21 @@ public class AccountController : Controller
             ViewData["ReturnUrl"] = returnUrl;
             
             // Intentar obtener tenant del request (con manejo de errores)
+            // IMPORTANTE: En Login, no es crítico tener tenant, puede ser super admin
             Guid? tenantId = null;
             try
             {
+                Console.WriteLine("[AccountController] Intentando resolver tenant...");
                 _logger.LogInformation("Intentando resolver tenant...");
                 tenantId = await _tenantResolver.ResolveTenantIdAsync();
+                Console.WriteLine($"[AccountController] Tenant resuelto: {tenantId?.ToString() ?? "NULL"}");
                 _logger.LogInformation("Tenant resuelto: {TenantId}", tenantId?.ToString() ?? "NULL");
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[AccountController] WARNING: Error al resolver tenant: {ex.GetType().Name} - {ex.Message}");
                 _logger.LogWarning(ex, "Error al resolver tenant, continuando sin tenant");
-                // Continuar sin tenant (puede ser super admin)
+                // Continuar sin tenant (puede ser super admin o primera vez)
             }
             ViewData["TenantId"] = tenantId;
 
@@ -84,11 +89,19 @@ public class AccountController : Controller
                 // Continuar sin valores por defecto
             }
 
+            Console.WriteLine("[AccountController] Login GET completado exitosamente, retornando View");
             _logger.LogInformation("=== AccountController.Login (GET) completado exitosamente ===");
             return View(model);
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[AccountController] ERROR en Login GET: {ex.GetType().Name}");
+            Console.WriteLine($"[AccountController] Mensaje: {ex.Message}");
+            Console.WriteLine($"[AccountController] StackTrace: {ex.StackTrace}");
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"[AccountController] InnerException: {ex.InnerException.GetType().Name} - {ex.InnerException.Message}");
+            }
             _logger.LogError(ex, "=== ERROR en AccountController.Login (GET) ===");
             _logger.LogError("Exception Type: {Type}, Message: {Message}, StackTrace: {StackTrace}", 
                 ex.GetType().FullName, ex.Message, ex.StackTrace);

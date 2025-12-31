@@ -28,6 +28,10 @@ public class TenantValidationMiddleware
     {
         // Skip validation para health checks, endpoints públicos, login y archivos estáticos
         var path = context.Request.Path.Value?.ToLower() ?? "";
+        var originalPath = context.Request.Path.Value ?? "";
+        
+        // Log para debugging
+        _logger.LogDebug("TenantValidationMiddleware: Path={Path}, Method={Method}", originalPath, context.Request.Method);
         
         // Excluir archivos estáticos (CSS, JS, imágenes, fuentes, etc.)
         var isStaticFile = path.StartsWith("/css/") ||
@@ -50,12 +54,18 @@ public class TenantValidationMiddleware
                           path.EndsWith(".ttf") ||
                           path.EndsWith(".eot");
         
-        if (isStaticFile ||
-            path.StartsWith("/health") || 
-            path.StartsWith("/api/public") || 
-            path.StartsWith("/account/login") ||
-            path.StartsWith("/account/accessdenied"))
+        // Excluir rutas públicas (case-insensitive)
+        var isPublicRoute = path == "/" ||
+                           path.StartsWith("/health") || 
+                           path.StartsWith("/api/public") || 
+                           path.StartsWith("/account/login") ||
+                           path.StartsWith("/account/accessdenied") ||
+                           path.StartsWith("/account/register") ||
+                           path.StartsWith("/account/logout");
+        
+        if (isStaticFile || isPublicRoute)
         {
+            _logger.LogDebug("TenantValidationMiddleware: Skipping validation for public route: {Path}", originalPath);
             await _next(context);
             return;
         }
@@ -83,9 +93,10 @@ public class TenantValidationMiddleware
 
             if (tenantId == null || tenantId == Guid.Empty)
             {
-                // Si no está autenticado, redirigir a login
+                // Si no está autenticado, redirigir a login (pero solo si no es una ruta pública)
                 if (context.User?.Identity?.IsAuthenticated != true)
                 {
+                    _logger.LogWarning("TenantValidationMiddleware: No tenant y usuario no autenticado, redirigiendo a login. Path={Path}", originalPath);
                     context.Response.Redirect("/Account/Login");
                     return;
                 }
