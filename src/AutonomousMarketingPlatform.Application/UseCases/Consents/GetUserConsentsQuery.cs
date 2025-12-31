@@ -44,10 +44,10 @@ public class GetUserConsentsQueryHandler : IRequestHandler<GetUserConsentsQuery,
                 UserId = request.UserId,
                 Consents = new List<ConsentDto>
                 {
-                    new ConsentDto { ConsentType = "AIGeneration", ConsentTypeDisplayName = "Generación de Contenido con IA", Description = "Permite al sistema generar contenido publicitario usando inteligencia artificial.", Required = true, IsGranted = false },
-                    new ConsentDto { ConsentType = "DataProcessing", ConsentTypeDisplayName = "Procesamiento de Datos", Description = "Permite procesar y analizar datos para mejorar el marketing.", Required = true, IsGranted = false },
-                    new ConsentDto { ConsentType = "AutoPublishing", ConsentTypeDisplayName = "Publicación Automática", Description = "Permite publicar contenido automáticamente en redes sociales.", Required = false, IsGranted = false },
-                    new ConsentDto { ConsentType = "Analytics", ConsentTypeDisplayName = "Análisis y Métricas", Description = "Permite recopilar y analizar métricas de rendimiento.", Required = false, IsGranted = false }
+                    new ConsentDto { ConsentType = "AIGeneration", ConsentTypeDisplayName = "Generación de Contenido con IA", Description = "Permite al sistema generar contenido publicitario usando inteligencia artificial.", IsRequired = true, IsGranted = false },
+                    new ConsentDto { ConsentType = "DataProcessing", ConsentTypeDisplayName = "Procesamiento de Datos", Description = "Permite procesar y analizar datos para mejorar el marketing.", IsRequired = true, IsGranted = false },
+                    new ConsentDto { ConsentType = "AutoPublishing", ConsentTypeDisplayName = "Publicación Automática", Description = "Permite publicar contenido automáticamente en redes sociales.", IsRequired = false, IsGranted = false },
+                    new ConsentDto { ConsentType = "Analytics", ConsentTypeDisplayName = "Análisis y Métricas", Description = "Permite recopilar y analizar métricas de rendimiento.", IsRequired = false, IsGranted = false }
                 },
                 AllRequiredConsentsGranted = false,
                 MissingRequiredConsents = new List<string> { "Generación de Contenido con IA", "Procesamiento de Datos" }
