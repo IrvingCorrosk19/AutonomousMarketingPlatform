@@ -60,6 +60,7 @@ public class ConsentsController : Controller
     /// Otorga un consentimiento.
     /// </summary>
     [HttpPost]
+    [Route("Consents/Grant")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Grant([FromForm] CreateConsentDto dto)
     {

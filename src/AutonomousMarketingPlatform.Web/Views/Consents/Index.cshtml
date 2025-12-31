@@ -118,7 +118,7 @@
                                             <strong>No otorgado</strong>
                                         </div>
 
-                                        <form asp-action="Grant" method="post" class="d-inline">
+                                        <form asp-action="Grant" asp-controller="Consents" method="post" class="d-inline">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="ConsentType" value="@consent.ConsentType" />
                                             <input type="hidden" name="ConsentVersion" value="1.0" />
