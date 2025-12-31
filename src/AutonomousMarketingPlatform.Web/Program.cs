@@ -26,28 +26,19 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 
 // Configurar Entity Framework Core con PostgreSQL
-// Intentar obtener desde variables de entorno primero (para Render), luego desde configuración
-var envConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
-var configConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-
-var connectionString = envConnectionString ?? configConnectionString;
+// Prioridad: Variable de entorno > appsettings.Production.json > appsettings.json
+var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection") 
+    ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
 if (string.IsNullOrEmpty(connectionString))
 {
-    // Log para debugging (usando Console ya que el logger aún no está configurado)
-    Console.WriteLine($"[ERROR] Connection string not found.");
-    Console.WriteLine($"[DEBUG] Environment variable 'ConnectionStrings__DefaultConnection' exists: {!string.IsNullOrEmpty(envConnectionString)}");
-    Console.WriteLine($"[DEBUG] Configuration 'DefaultConnection' exists: {!string.IsNullOrEmpty(configConnectionString)}");
-    Console.WriteLine($"[DEBUG] All environment variables starting with 'ConnectionStrings':");
-    foreach (var envVar in Environment.GetEnvironmentVariables().Keys.Cast<string>().Where(k => k.StartsWith("ConnectionStrings", StringComparison.OrdinalIgnoreCase)))
-    {
-        Console.WriteLine($"[DEBUG]   {envVar} = {Environment.GetEnvironmentVariable(envVar)?.Substring(0, Math.Min(50, Environment.GetEnvironmentVariable(envVar)?.Length ?? 0))}...");
-    }
-    
-    throw new InvalidOperationException(
-        "Connection string 'DefaultConnection' not found. " +
-        "Please configure 'ConnectionStrings__DefaultConnection' environment variable in Render Dashboard (Environment section) or add it to appsettings.json");
+    var errorMsg = "Connection string 'DefaultConnection' not found. " +
+        "Please configure 'ConnectionStrings__DefaultConnection' environment variable or add it to appsettings.json";
+    Console.WriteLine($"[ERROR] {errorMsg}");
+    throw new InvalidOperationException(errorMsg);
 }
+
+Console.WriteLine($"[INFO] Using connection string from: {(Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection") != null ? "Environment Variable" : "Configuration File")}");
 
 // Registrar servicios de infraestructura primero (para evitar dependencia circular)
 builder.Services.AddHttpContextAccessor();
