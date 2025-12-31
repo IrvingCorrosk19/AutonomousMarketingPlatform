@@ -29,10 +29,27 @@ public class GlobalExceptionHandlerMiddleware
     {
         try
         {
+            // Log del request entrante para debugging
+            _logger.LogDebug("Request incoming: {Method} {Path} | RequestId={RequestId}", 
+                context.Request.Method, context.Request.Path, context.TraceIdentifier);
+            
             await _next(context);
+            
+            // Log del response exitoso
+            _logger.LogDebug("Request completed: {Method} {Path} | Status={StatusCode} | RequestId={RequestId}", 
+                context.Request.Method, context.Request.Path, context.Response.StatusCode, context.TraceIdentifier);
         }
         catch (Exception ex)
         {
+            // Log inmediato antes de manejar (para asegurar que se capture)
+            _logger.LogError(ex, 
+                "EXCEPTION CAUGHT in GlobalExceptionHandlerMiddleware: RequestId={RequestId} | Path={Path} | Method={Method} | ExceptionType={ExceptionType} | Message={Message}", 
+                context.TraceIdentifier, 
+                context.Request.Path, 
+                context.Request.Method,
+                ex.GetType().FullName,
+                ex.Message);
+            
             await HandleExceptionAsync(context, ex);
         }
     }
