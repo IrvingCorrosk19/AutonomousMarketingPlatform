@@ -3,6 +3,8 @@ services:
     name: autonomous-marketing-platform
     env: dotnet
     plan: starter
+    region: virginia
+    branch: main
     buildCommand: dotnet publish -c Release -o ./publish
     startCommand: cd publish && dotnet AutonomousMarketingPlatform.Web.dll
     envVars:
@@ -26,10 +28,6 @@ services:
         sync: false
       - key: AI__OpenAI__Model
         value: gpt-4
-
-databases:
-  - name: autonomous-marketing-platform-db
-    databaseName: autonomousmarketingplatform
-    user: autonomousmarketingplatform
-    plan: starter
+      - key: MultiTenant__ValidationEnabled
+        value: "true"
 
