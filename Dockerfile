@@ -2,14 +2,14 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Copy solution and project files
-COPY AutonomousMarketingPlatform.sln .
+# Copy project files first (for better layer caching)
 COPY src/AutonomousMarketingPlatform.Domain/AutonomousMarketingPlatform.Domain.csproj src/AutonomousMarketingPlatform.Domain/
 COPY src/AutonomousMarketingPlatform.Application/AutonomousMarketingPlatform.Application.csproj src/AutonomousMarketingPlatform.Application/
 COPY src/AutonomousMarketingPlatform.Infrastructure/AutonomousMarketingPlatform.Infrastructure.csproj src/AutonomousMarketingPlatform.Infrastructure/
 COPY src/AutonomousMarketingPlatform.Web/AutonomousMarketingPlatform.Web.csproj src/AutonomousMarketingPlatform.Web/
 
-# Restore dependencies
+# Restore dependencies for the Web project (which will restore all dependencies)
+WORKDIR /src/src/AutonomousMarketingPlatform.Web
 RUN dotnet restore
 
 # Copy everything else and build
