@@ -71,6 +71,18 @@ public class TenantResolverService : ITenantResolverService
             }
         }
 
+        // Prioridad 4: Tenant por defecto (cuando no hay subdominio)
+        // Esto permite que la aplicación funcione en el dominio raíz sin subdominio
+        var defaultTenantId = await GetDefaultTenantIdAsync();
+        if (defaultTenantId.HasValue)
+        {
+            _logger.LogInformation("Usando tenant por defecto (sin subdominio): TenantId={TenantId}, Host={Host}",
+                defaultTenantId.Value, host);
+            httpContext.Items["ResolvedTenantId"] = defaultTenantId.Value;
+            httpContext.Items["IsDefaultTenant"] = true;
+            return defaultTenantId;
+        }
+
         return null;
     }
 
@@ -114,6 +126,40 @@ public class TenantResolverService : ITenantResolverService
         {
             _logger.LogError(ex, "Error al validar tenant: TenantId={TenantId}", tenantId);
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Obtiene el tenant por defecto cuando no hay subdominio.
+    /// Busca un tenant con subdomain "default" o el primer tenant activo.
+    /// </summary>
+    private async Task<Guid?> GetDefaultTenantIdAsync()
+    {
+        try
+        {
+            using var context = await _dbContextFactory.CreateDbContextAsync();
+            
+            // Primero intentar encontrar un tenant con subdomain "default"
+            var defaultTenant = await context.Tenants
+                .FirstOrDefaultAsync(t => t.Subdomain == "default" && t.IsActive);
+            
+            if (defaultTenant != null)
+            {
+                return defaultTenant.Id;
+            }
+
+            // Si no existe "default", usar el primer tenant activo
+            var firstTenant = await context.Tenants
+                .Where(t => t.IsActive)
+                .OrderBy(t => t.CreatedAt)
+                .FirstOrDefaultAsync();
+            
+            return firstTenant?.Id;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al obtener tenant por defecto");
+            return null;
         }
     }
 }

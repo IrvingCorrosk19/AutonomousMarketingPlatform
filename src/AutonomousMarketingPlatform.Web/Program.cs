@@ -249,6 +249,34 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Seed roles (siempre, en desarrollo y producción)
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var roleSeeder = scope.ServiceProvider.GetRequiredService<RoleSeeder>();
+        await roleSeeder.SeedRolesAsync();
+
+        // Crear tenant por defecto si no existe (siempre, para que funcione sin subdominio)
+        var userSeeder = scope.ServiceProvider.GetRequiredService<UserSeeder>();
+        var defaultTenant = await userSeeder.CreateTestTenantAsync(
+            name: "Tenant por Defecto",
+            subdomain: "default",
+            contactEmail: "default@autonomousmarketingplatform.com");
+        
+        if (defaultTenant != null)
+        {
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            logger.LogInformation("Tenant por defecto verificado/creado: {TenantId}", defaultTenant.Id);
+        }
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Error al inicializar datos del sistema");
+    }
+}
+
 // Seed roles y usuario inicial (solo en desarrollo)
 if (app.Environment.IsDevelopment())
 {
@@ -256,9 +284,6 @@ if (app.Environment.IsDevelopment())
     {
         try
         {
-            var roleSeeder = scope.ServiceProvider.GetRequiredService<RoleSeeder>();
-            await roleSeeder.SeedRolesAsync();
-
             // Crear tenant y usuario de prueba
             var userSeeder = scope.ServiceProvider.GetRequiredService<UserSeeder>();
             

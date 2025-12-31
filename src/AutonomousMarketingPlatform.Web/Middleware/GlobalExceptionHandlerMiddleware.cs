@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using AutonomousMarketingPlatform.Domain.Exceptions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
@@ -83,6 +84,12 @@ public class GlobalExceptionHandlerMiddleware
                 response.StatusCode = (int)HttpStatusCode.NotFound;
                 errorResponse.Code = "NOT_FOUND";
                 errorResponse.Message = "Recurso no encontrado";
+                break;
+
+            case TenantNotResolvedException tenantEx:
+                response.StatusCode = (int)HttpStatusCode.BadRequest;
+                errorResponse.Code = "TENANT_NOT_RESOLVED";
+                errorResponse.Message = tenantEx.Message;
                 break;
 
             default:
