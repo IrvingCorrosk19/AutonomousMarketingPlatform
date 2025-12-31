@@ -82,7 +82,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.BACKEND_URL || 'http://localhost:56610' }}/api/metrics/campaign",
+        "url": "={{ ($env.BACKEND_URL && $env.BACKEND_URL !== 'http://localhost:5000') ? $env.BACKEND_URL : 'https://autonomousmarketingplatform.onrender.com' }}/api/metrics/campaign",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -102,7 +102,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.BACKEND_URL || 'http://localhost:56610' }}/api/metrics/publishing-job",
+        "url": "={{ ($env.BACKEND_URL && $env.BACKEND_URL !== 'http://localhost:5000') ? $env.BACKEND_URL : 'https://autonomousmarketingplatform.onrender.com' }}/api/metrics/publishing-job",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
@@ -122,7 +122,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.BACKEND_URL || 'http://localhost:56610' }}/api/memory/save",
+        "url": "={{ ($env.BACKEND_URL && $env.BACKEND_URL !== 'http://localhost:5000') ? $env.BACKEND_URL : 'https://autonomousmarketingplatform.onrender.com' }}/api/memory/save",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,

@@ -76,7 +76,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.BACKEND_URL || 'http://localhost:56610' }}/api/marketing-packs",
+        "url": "={{ ($env.BACKEND_URL && $env.BACKEND_URL !== 'http://localhost:5000') ? $env.BACKEND_URL : 'https://autonomousmarketingplatform.onrender.com' }}/api/marketing-packs",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,

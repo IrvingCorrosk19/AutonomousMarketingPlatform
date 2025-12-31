@@ -249,7 +249,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.BACKEND_URL || 'http://localhost:56610' }}/api/publishing-jobs",
+        "url": "={{ ($env.BACKEND_URL && $env.BACKEND_URL !== 'http://localhost:5000') ? $env.BACKEND_URL : 'https://autonomousmarketingplatform.onrender.com' }}/api/publishing-jobs",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
