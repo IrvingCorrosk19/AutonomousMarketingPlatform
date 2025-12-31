@@ -27,5 +27,16 @@
     <None Include="wwwroot\uploads\**\*" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Asegurar que las vistas Razor se incluyan en el publish -->
+    <Content Include="Views\**\*.cshtml" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <!-- Asegurar que las vistas compiladas se incluyan en el output -->
+    <RazorCompileOnBuild>true</RazorCompileOnBuild>
+    <RazorCompileOnPublish>true</RazorCompileOnPublish>
+  </PropertyGroup>
+
 </Project>
 
