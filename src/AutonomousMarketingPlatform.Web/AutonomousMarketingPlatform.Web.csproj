@@ -30,6 +30,8 @@
   <ItemGroup>
     <!-- Asegurar que las vistas Razor se incluyan en el publish -->
     <Content Include="Views\**\*.cshtml" />
+    <!-- Asegurar que wwwroot se incluya en el publish -->
+    <Content Include="wwwroot\**\*" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -38,6 +40,8 @@
     <RazorCompileOnPublish>true</RazorCompileOnPublish>
     <!-- Incluir archivos .cshtml en el publish (necesarios para runtime compilation si está habilitado) -->
     <CopyRazorGenerateFilesToPublishDirectory>true</CopyRazorGenerateFilesToPublishDirectory>
+    <!-- Asegurar que los archivos de contenido se copien al publish -->
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
   </PropertyGroup>
 
 </Project>
