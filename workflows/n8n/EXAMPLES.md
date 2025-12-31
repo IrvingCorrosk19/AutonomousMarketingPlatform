@@ -182,7 +182,7 @@ curl -X POST https://your-n8n-instance.com/webhook/validate-consents \
   }'
 ```
 
-**Backend Response (GET /api/consents/check?tenantId=xxx&userId=yyy):**
+**Backend Response (GET /api/ConsentsApi/check?tenantId=xxx&userId=yyy):**
 ```json
 {
   "aiConsent": true,

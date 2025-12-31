@@ -137,7 +137,7 @@ Workflow que valida los consentimientos del usuario antes de continuar con el fl
 }
 ```
 
-**Respuesta del Backend (GET /api/consents/check):**
+**Respuesta del Backend (GET /api/ConsentsApi/check):**
 ```json
 {
   "aiConsent": true,
@@ -190,7 +190,7 @@ Workflow que valida los consentimientos del usuario antes de continuar con el fl
 ```
 
 **Notas:**
-- El workflow consulta al backend mediante HTTP GET a `/api/consents/check?tenantId=xxx&userId=yyy`
+- El workflow consulta al backend mediante HTTP GET a `/api/ConsentsApi/check?tenantId=xxx&userId=yyy`
 - Requiere que el backend tenga configurada la variable de entorno `BACKEND_URL` o usa `http://localhost:56610` por defecto
 - Valida tanto la respuesta HTTP como los valores de los consentimientos
 
