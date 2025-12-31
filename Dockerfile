@@ -24,11 +24,11 @@ WORKDIR /app
 # Copy published app
 COPY --from=build /app/publish .
 
-# Expose port (Render will set PORT env var)
+# Expose port (Render will set PORT env var dynamically)
 EXPOSE 8080
 
 # Set environment variables
-ENV ASPNETCORE_URLS=http://0.0.0.0:8080
+# Note: ASPNETCORE_URLS will be overridden by Render's $PORT env var
 ENV ASPNETCORE_ENVIRONMENT=Production
 
 # Run the app
