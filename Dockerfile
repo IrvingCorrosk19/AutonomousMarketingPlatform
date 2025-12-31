@@ -29,9 +29,10 @@ WORKDIR /app
 # Copy published app (esto incluye DLLs, configs, etc.)
 COPY --from=build /app/publish .
 
-# Asegurar que wwwroot y Views se copien explícitamente si no están en publish
-# (por si acaso no se copiaron automáticamente)
-RUN mkdir -p wwwroot Views || true
+# Copiar explícitamente Views y wwwroot desde el build stage si no están en publish
+# Esto asegura que las vistas estén disponibles en tiempo de ejecución
+COPY --from=build /src/src/AutonomousMarketingPlatform.Web/Views ./Views
+COPY --from=build /src/src/AutonomousMarketingPlatform.Web/wwwroot ./wwwroot
 
 # Expose port (Render will set PORT env var dynamically)
 EXPOSE 8080
