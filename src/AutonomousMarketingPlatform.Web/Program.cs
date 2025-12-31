@@ -332,7 +332,8 @@ if (app.Environment.IsDevelopment())
 // Configure the HTTP request pipeline.
 
 // 1. Manejo global de excepciones (primero)
-app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
+// TEMPORALMENTE DESACTIVADO PARA DEBUGGING
+// app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 
 // 2. Headers de seguridad
 app.UseMiddleware<SecurityHeadersMiddleware>();
