@@ -191,7 +191,7 @@
       "position": [1250, 400],
       "parameters": {
         "method": "GET",
-        "url": "={{ ($env.BACKEND_URL && $env.BACKEND_URL !== 'http://localhost:5000') ? $env.BACKEND_URL : 'https://autonomousmarketingplatform.onrender.com' }}/api/ConsentsApi/check?tenantId={{ $node[\"Set Validated Data\"].json.tenantId }}&userId={{ $node[\"Set Validated Data\"].json.userId }}",
+        "url": "=https://autonomousmarketingplatform.onrender.com/api/ConsentsApi/check?tenantId={{ $node[\"Set Validated Data\"].json.tenantId }}&userId={{ $node[\"Set Validated Data\"].json.userId }}",
         "sendQuery": false,
         "options": { 
           "timeout": 30000,
