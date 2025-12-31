@@ -1,100 +1,113 @@
 @model AutonomousMarketingPlatform.Application.DTOs.LoginDto
 @{
     ViewData["Title"] = "Iniciar Sesión";
-    Layout = "_Layout_Login";
+    Layout = "_AuthLayout";
 }
 
-<div class="login-box">
-    <div class="login-logo">
-        <b>Autonomous</b> Marketing
+<div class="auth-card">
+    <!-- Header -->
+    <div class="auth-header">
+        <h1 class="auth-title">Autonomous Marketing</h1>
+        <p class="auth-subtitle">Inicia sesión en tu cuenta</p>
     </div>
-    
-    <div class="card">
-        <div class="card-body login-card-body">
-            <p class="login-box-msg">Inicia sesión</p>
-            
-            @if (!string.IsNullOrEmpty(ViewData["TenantId"]?.ToString()))
-            {
-                <div class="alert alert-info">
-                    <strong>Tenant:</strong> @ViewData["TenantId"]
-                </div>
-            }
-            
-            @if (ViewData["LockoutEnd"] != null)
-            {
-                <div class="alert alert-warning">
-                    <strong>Cuenta bloqueada</strong><br>
-                    Tu cuenta ha sido bloqueada temporalmente hasta: @(((DateTime?)ViewData["LockoutEnd"])?.ToString("g"))
-                </div>
-            }
-            
-            @if (ViewData["RemainingAttempts"] != null && (int)ViewData["RemainingAttempts"]! < 5)
-            {
-                <div class="alert alert-warning">
-                    <strong>Atención</strong><br>
-                    Intentos restantes: @ViewData["RemainingAttempts"]
-                </div>
-            }
-            
-            @if (!ViewData.ModelState.IsValid)
-            {
-                <div class="alert alert-danger">
-                    <ul class="mb-0">
-                        @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
-                        {
-                            <li>@error.ErrorMessage</li>
-                        }
-                    </ul>
-                </div>
-            }
-            
-            <form asp-action="Login" asp-controller="Account" method="post" id="loginForm">
-                @Html.AntiForgeryToken()
-                
-                @if (ViewData["TenantId"] != null)
-                {
-                    <input type="hidden" asp-for="TenantId" name="TenantId" value="@ViewData["TenantId"]" />
-                }
-                else
-                {
-                    <input type="hidden" asp-for="TenantId" name="TenantId" value="" />
-                }
-                <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
-                
-                <div class="input-group mb-3">
-                    <input asp-for="Email" name="Email" id="Email" type="email" class="form-control" placeholder="Correo electrónico" required autocomplete="email" autofocus>
-                    <div class="input-group-append">
-                        <div class="input-group-text">
-                            <span class="fas fa-envelope"></span>
-                        </div>
-                    </div>
-                </div>
-                <span asp-validation-for="Email" class="text-danger"></span>
-                
-                <div class="input-group mb-3">
-                    <input asp-for="Password" name="Password" id="Password" type="password" class="form-control" placeholder="Contraseña" required autocomplete="current-password">
-                    <div class="input-group-append">
-                        <div class="input-group-text">
-                            <span class="fas fa-lock"></span>
-                        </div>
-                    </div>
-                </div>
-                <span asp-validation-for="Password" class="text-danger"></span>
-                
-                <div class="row">
-                    <div class="col-8">
-                        <div class="icheck-primary">
-                            <input type="checkbox" asp-for="RememberMe" name="RememberMe" id="remember" value="true">
-                            <label for="remember">Recordarme</label>
-                        </div>
-                    </div>
-                    <div class="col-4">
-                        <button type="submit" class="btn btn-primary btn-block" id="loginBtn">Iniciar sesión</button>
-                    </div>
-                </div>
-            </form>
+
+    <!-- Tenant Badge (discreto) -->
+    @if (!string.IsNullOrEmpty(ViewData["TenantId"]?.ToString()))
+    {
+        <div class="tenant-badge">
+            <span class="badge-text">Tenant: @ViewData["TenantId"]</span>
         </div>
-    </div>
+    }
+
+    <!-- Alerts -->
+    @if (ViewData["LockoutEnd"] != null)
+    {
+        <div class="alert alert-warning">
+            <strong>Cuenta bloqueada</strong><br>
+            Tu cuenta ha sido bloqueada temporalmente hasta: @(((DateTime?)ViewData["LockoutEnd"])?.ToString("g"))
+        </div>
+    }
+    
+    @if (ViewData["RemainingAttempts"] != null && (int)ViewData["RemainingAttempts"]! < 5)
+    {
+        <div class="alert alert-warning">
+            <strong>Atención</strong><br>
+            Intentos restantes: @ViewData["RemainingAttempts"]
+        </div>
+    }
+    
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <div class="alert alert-danger">
+            <ul class="mb-0">
+                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    <li>@error.ErrorMessage</li>
+                }
+            </ul>
+        </div>
+    }
+
+    <!-- Login Form -->
+    <form asp-action="Login" asp-controller="Account" method="post" id="loginForm" class="auth-form">
+        @Html.AntiForgeryToken()
+        
+        @if (ViewData["TenantId"] != null)
+        {
+            <input type="hidden" asp-for="TenantId" name="TenantId" value="@ViewData["TenantId"]" />
+        }
+        else
+        {
+            <input type="hidden" asp-for="TenantId" name="TenantId" value="" />
+        }
+        <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
+        
+        <!-- Email Field -->
+        <div class="form-field">
+            <label for="Email" class="form-label">Correo electrónico</label>
+            <input 
+                asp-for="Email" 
+                name="Email"
+                id="Email"
+                type="email" 
+                class="form-control" 
+                placeholder="tu@email.com" 
+                required 
+                autocomplete="email"
+                autofocus>
+            <span asp-validation-for="Email" class="text-danger"></span>
+        </div>
+        
+        <!-- Password Field -->
+        <div class="form-field">
+            <label for="Password" class="form-label">Contraseña</label>
+            <input 
+                asp-for="Password" 
+                name="Password"
+                id="Password"
+                type="password" 
+                class="form-control" 
+                placeholder="••••••••" 
+                required 
+                autocomplete="current-password">
+            <span asp-validation-for="Password" class="text-danger"></span>
+        </div>
+        
+        <!-- Remember Me -->
+        <div class="form-field">
+            <div class="form-check">
+                <input type="checkbox" asp-for="RememberMe" name="RememberMe" id="remember" value="true" class="form-check-input">
+                <label for="remember" class="form-check-label">Recordarme</label>
+            </div>
+        </div>
+        
+        <!-- Submit Button -->
+        <div class="form-field">
+            <button type="submit" class="btn btn-primary btn-block" id="loginBtn">
+                Iniciar sesión
+            </button>
+        </div>
+    </form>
 </div>
 
 @section Scripts {
