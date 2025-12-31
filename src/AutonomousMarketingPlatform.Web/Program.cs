@@ -353,11 +353,26 @@ app.UseAuthentication();
 // 5. Tenant Resolver (después de auth, para poder leer claims)
 app.Use(async (context, next) =>
 {
-    var tenantResolver = context.RequestServices.GetRequiredService<ITenantResolverService>();
-    var tenantId = await tenantResolver.ResolveTenantIdAsync();
-    if (tenantId.HasValue)
+    try
     {
-        context.Items["TenantId"] = tenantId.Value;
+        var tenantResolver = context.RequestServices.GetRequiredService<ITenantResolverService>();
+        var tenantId = await tenantResolver.ResolveTenantIdAsync();
+        if (tenantId.HasValue)
+        {
+            context.Items["TenantId"] = tenantId.Value;
+        }
+        else
+        {
+            var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogWarning("TenantResolver no pudo resolver tenant: Path={Path}, Host={Host}", 
+                context.Request.Path, context.Request.Host.Host);
+        }
+    }
+    catch (Exception ex)
+    {
+        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Error en TenantResolver middleware: Path={Path}", context.Request.Path);
+        // No lanzar excepción aquí, dejar que el middleware de validación maneje
     }
     await next();
 });
