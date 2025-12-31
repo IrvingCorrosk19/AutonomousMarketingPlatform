@@ -27,6 +27,34 @@ bld/
 # Visual Studio cache/options directory
 .vs/
 
+# Visual Studio Code
+.vscode/
+
+# Rider
+.idea/
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
 # .NET Core
 project.lock.json
 project.fragment.lock.json
@@ -40,95 +68,39 @@ artifacts/
 *.nuget.props
 *.nuget.targets
 
-# ASP.NET Scaffolding
-ScaffoldingReadMe.txt
+# Publish
+publish/
+*.publishproj
 
-# Files built by Visual Studio
-*_i.c
-*_p.c
-*_h.h
-*.ilk
-*.meta
-*.obj
-*.iobj
-*.pch
-*.pdb
-*.ipdb
-*.pgc
-*.pgd
-*.rsp
-*.sbr
-*.tlb
-*.tli
-*.tlh
-*.tmp
-*.tmp_proj
-*_wpftmp.csproj
-*.log
-*.vspscc
-*.vssscc
-.builds
-*.pidb
-*.svclog
-*.scc
-
-# Visual C++ cache files
-ipch/
-*.aps
-*.ncb
-*.opendb
-*.opensdf
-*.sdf
-*.cachefile
-*.VC.db
-*.VC.VC.opendb
-
-# Visual Studio profiler
-*.psess
-*.vsp
-*.vspx
-*.sap
-
-# ReSharper
-_ReSharper*/
-*.[Rr]e[Ss]harper
-*.DotSettings.user
-
-# Rider
-.idea/
-*.sln.iml
-
-# CodeRush
-.cr/
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Node
+# Node.js
 node_modules/
 npm-debug.log
 yarn-error.log
-
-# Environment variables
-.env
-.env.local
-appsettings.Development.json
-appsettings.Production.json
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Migrations (mantener en el repo)
-# !src/**/Migrations/
+# Logs
+*.log
 
-# Uploads temporales (no deben estar en el repo)
-**/wwwroot/uploads/temp/*
-**/wwwroot/uploads/temp/
+# Database
+*.db
+*.sqlite
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+*.cache

@@ -13,6 +13,13 @@ using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configurar puerto para Render (lee PORT de variable de entorno)
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(port))
+{
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+}
+
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();

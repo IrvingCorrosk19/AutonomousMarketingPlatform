@@ -249,7 +249,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.BACKEND_URL || 'http://localhost:5000' }}/api/publishing-jobs",
+        "url": "={{ $env.BACKEND_URL || 'http://localhost:56610' }}/api/publishing-jobs",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,

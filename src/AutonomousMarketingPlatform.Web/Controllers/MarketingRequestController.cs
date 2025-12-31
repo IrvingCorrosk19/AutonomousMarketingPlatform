@@ -1,6 +1,8 @@
 using AutonomousMarketingPlatform.Application.Services;
+using AutonomousMarketingPlatform.Application.UseCases.Campaigns;
 using AutonomousMarketingPlatform.Web.Attributes;
 using AutonomousMarketingPlatform.Web.Helpers;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,13 +17,16 @@ namespace AutonomousMarketingPlatform.Web.Controllers;
 public class MarketingRequestController : Controller
 {
     private readonly IExternalAutomationService _automationService;
+    private readonly IMediator _mediator;
     private readonly ILogger<MarketingRequestController> _logger;
 
     public MarketingRequestController(
         IExternalAutomationService automationService,
+        IMediator mediator,
         ILogger<MarketingRequestController> logger)
     {
         _automationService = automationService;
+        _mediator = mediator;
         _logger = logger;
     }
 
@@ -31,13 +36,62 @@ public class MarketingRequestController : Controller
     [HttpGet]
     public IActionResult Create(Guid? campaignId = null)
     {
-        ViewBag.CampaignId = campaignId;
-        return View(new MarketingRequestDto
+        try
         {
-            CampaignId = campaignId,
-            Channels = new List<string> { "instagram" },
-            RequiresApproval = false
-        });
+            _logger.LogInformation("=== INICIO MarketingRequestController.Create (GET) ===");
+            _logger.LogInformation("Request Path: {Path}", HttpContext.Request.Path);
+            _logger.LogInformation("Query String: {QueryString}", HttpContext.Request.QueryString);
+            _logger.LogInformation("CampaignId recibido: {CampaignId}", campaignId?.ToString() ?? "NULL");
+            
+            // Verificar autenticación
+            _logger.LogInformation("User autenticado: {IsAuthenticated}", User?.Identity?.IsAuthenticated ?? false);
+            _logger.LogInformation("User Name: {UserName}", User?.Identity?.Name ?? "NULL");
+            
+            // Verificar roles
+            var roles = User?.Claims?.Where(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Select(c => c.Value)?.ToList() ?? new List<string>();
+            _logger.LogInformation("Roles del usuario: {Roles}", string.Join(", ", roles));
+            
+            // Verificar claims específicos
+            var isSuperAdmin = User?.HasClaim("IsSuperAdmin", "true") ?? false;
+            _logger.LogInformation("IsSuperAdmin: {IsSuperAdmin}", isSuperAdmin);
+            
+            var userId = UserHelper.GetUserId(User);
+            var tenantId = UserHelper.GetTenantId(User);
+            _logger.LogInformation("UserId: {UserId}, TenantId: {TenantId}", 
+                userId?.ToString() ?? "NULL", 
+                tenantId?.ToString() ?? "NULL");
+            
+            ViewBag.CampaignId = campaignId;
+            
+            var model = new MarketingRequestDto
+            {
+                CampaignId = campaignId,
+                Channels = new List<string> { "instagram" },
+                RequiresApproval = false
+            };
+            
+            _logger.LogInformation("Model creado: CampaignId={CampaignId}, Channels={Channels}", 
+                model.CampaignId?.ToString() ?? "NULL",
+                string.Join(", ", model.Channels ?? new List<string>()));
+            
+            _logger.LogInformation("=== FIN MarketingRequestController.Create (GET) - Retornando View ===");
+            return View(model);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "=== ERROR en MarketingRequestController.Create (GET) ===");
+            _logger.LogError("Exception Type: {Type}", ex.GetType().Name);
+            _logger.LogError("Exception Message: {Message}", ex.Message);
+            _logger.LogError("Stack Trace: {StackTrace}", ex.StackTrace);
+            
+            if (ex.InnerException != null)
+            {
+                _logger.LogError("Inner Exception: {InnerException}", ex.InnerException.Message);
+            }
+            
+            // Retornar error 500 en lugar de 400 para que se vea el error real
+            throw;
+        }
     }
 
     /// <summary>
@@ -93,11 +147,62 @@ public class MarketingRequestController : Controller
         try
         {
             var userId = UserHelper.GetUserId(User);
-            var tenantId = UserHelper.GetTenantId(User);
+            var currentTenantId = UserHelper.GetTenantId(User);
+            var isSuperAdmin = User.HasClaim("IsSuperAdmin", "true");
 
-            if (!userId.HasValue || !tenantId.HasValue)
+            if (!userId.HasValue)
             {
                 return RedirectToAction("Login", "Account");
+            }
+
+            // Determinar el tenantId a usar para la configuración de n8n
+            Guid effectiveTenantId;
+            
+            // Si es SuperAdmin y hay un CampaignId, obtener el TenantId de la campaña
+            if (isSuperAdmin && model.CampaignId.HasValue)
+            {
+                try
+                {
+                    var campaignRepository = HttpContext.RequestServices
+                    .GetRequiredService<Domain.Interfaces.ICampaignRepository>();
+                    
+                    // Obtener la campaña directamente (SuperAdmin puede ver cualquier campaña)
+                    var campaignEntity = await campaignRepository.GetCampaignWithDetailsAsync(
+                        model.CampaignId.Value, 
+                        Guid.Empty, // No filtrar por tenant para SuperAdmin
+                        CancellationToken.None);
+                    
+                    if (campaignEntity != null)
+                    {
+                        effectiveTenantId = campaignEntity.TenantId;
+                        _logger.LogInformation(
+                            "SuperAdmin usando TenantId de la campaña: {CampaignId} -> {TenantId}",
+                            model.CampaignId.Value, effectiveTenantId);
+                    }
+                    else
+                    {
+                        effectiveTenantId = currentTenantId ?? Guid.Empty;
+                        _logger.LogWarning(
+                            "Campaña {CampaignId} no encontrada, usando TenantId del usuario: {TenantId}",
+                            model.CampaignId.Value, effectiveTenantId);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error al obtener TenantId de la campaña {CampaignId}", model.CampaignId.Value);
+                    effectiveTenantId = currentTenantId ?? Guid.Empty;
+                }
+            }
+            else if (currentTenantId.HasValue)
+            {
+                effectiveTenantId = currentTenantId.Value;
+            }
+            else
+            {
+                _logger.LogError("No se pudo determinar TenantId para la solicitud");
+                ModelState.AddModelError(string.Empty, "No se pudo determinar el tenant. Por favor, contacta al administrador.");
+                ViewBag.CampaignId = model.CampaignId;
+                return View(model);
             }
 
             // Preparar datos para el webhook
@@ -109,9 +214,13 @@ public class MarketingRequestController : Controller
                 { "assets", assetsList }
             };
 
-            // Disparar webhook a n8n automáticamente
+            _logger.LogInformation(
+                "Enviando solicitud de marketing: EffectiveTenantId={EffectiveTenantId}, CampaignId={CampaignId}, UserId={UserId}",
+                effectiveTenantId, model.CampaignId?.ToString() ?? "NULL", userId.Value);
+
+            // Disparar webhook a n8n automáticamente usando el TenantId efectivo
             var requestId = await _automationService.TriggerAutomationAsync(
-                tenantId.Value,
+                effectiveTenantId,
                 "marketing.request",
                 eventData,
                 userId,
@@ -121,7 +230,7 @@ public class MarketingRequestController : Controller
 
             _logger.LogInformation(
                 "Solicitud de marketing enviada a n8n: TenantId={TenantId}, UserId={UserId}, RequestId={RequestId}",
-                tenantId.Value,
+                effectiveTenantId,
                 userId.Value,
                 requestId);
 

@@ -1,5 +1,6 @@
 using AutonomousMarketingPlatform.Application.DTOs;
 using AutonomousMarketingPlatform.Application.Services;
+using AutonomousMarketingPlatform.Application.UseCases.Campaigns;
 using AutonomousMarketingPlatform.Application.UseCases.N8n;
 using AutonomousMarketingPlatform.Application.UseCases.Tenants;
 using AutonomousMarketingPlatform.Web.Attributes;
@@ -248,33 +249,178 @@ public class N8nConfigController : Controller
                 return Json(new { success = false, message = "Usuario no autenticado correctamente o TenantId no especificado" });
             }
 
+            // Si hay campaignId, cargar los datos reales de la campaña
+            string instruction;
+            List<string> channels;
+            List<string> assets = request.Assets ?? new List<string>();
+            bool requiresApproval = request.RequiresApproval ?? false;
+            bool usingRealCampaignData = false;
+
+            if (request.CampaignId.HasValue)
+            {
+                try
+                {
+                    // Cargar datos reales de la campaña
+                    var campaignQuery = new GetCampaignQuery
+                    {
+                        TenantId = isSuperAdmin ? Guid.Empty : tenantId.Value,
+                        CampaignId = request.CampaignId.Value,
+                        IsSuperAdmin = isSuperAdmin
+                    };
+                    var campaign = await _mediator.Send(campaignQuery);
+
+                    if (campaign != null)
+                    {
+                        usingRealCampaignData = true;
+                        _logger.LogInformation(
+                            "Cargando datos reales de campaña: {CampaignName} (Id: {CampaignId})",
+                            campaign.Name, request.CampaignId.Value);
+
+                        // Construir instrucción usando datos reales de la campaña
+                        var instructionParts = new List<string>();
+                        
+                        if (!string.IsNullOrWhiteSpace(campaign.Description))
+                        {
+                            instructionParts.Add($"Campaña: {campaign.Name}. {campaign.Description}");
+                        }
+                        else
+                        {
+                            instructionParts.Add($"Campaña: {campaign.Name}");
+                        }
+
+                        // Agregar objetivos si existen
+                        if (campaign.Objectives != null && campaign.Objectives.ContainsKey("goals"))
+                        {
+                            if (campaign.Objectives["goals"] is System.Text.Json.JsonElement goalsElement && goalsElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+                            {
+                                var goals = goalsElement.EnumerateArray().Select(g => g.GetString()).Where(g => !string.IsNullOrWhiteSpace(g)).ToList();
+                                if (goals.Any())
+                                {
+                                    instructionParts.Add($"Objetivos: {string.Join(", ", goals)}");
+                                }
+                            }
+                        }
+
+                        // Agregar audiencia objetivo si existe
+                        if (campaign.TargetAudience != null)
+                        {
+                            var audienceParts = new List<string>();
+                            if (campaign.TargetAudience.ContainsKey("ageRange"))
+                            {
+                                var ageRange = campaign.TargetAudience["ageRange"]?.ToString();
+                                if (!string.IsNullOrWhiteSpace(ageRange))
+                                {
+                                    audienceParts.Add($"Edad: {ageRange}");
+                                }
+                            }
+                            if (campaign.TargetAudience.ContainsKey("interests"))
+                            {
+                                if (campaign.TargetAudience["interests"] is System.Text.Json.JsonElement interestsElement && interestsElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+                                {
+                                    var interests = interestsElement.EnumerateArray().Select(i => i.GetString()).Where(i => !string.IsNullOrWhiteSpace(i)).ToList();
+                                    if (interests.Any())
+                                    {
+                                        audienceParts.Add($"Intereses: {string.Join(", ", interests)}");
+                                    }
+                                }
+                            }
+                            if (audienceParts.Any())
+                            {
+                                instructionParts.Add($"Audiencia objetivo: {string.Join(". ", audienceParts)}");
+                            }
+                        }
+
+                        // Usar canales reales de la campaña si están disponibles
+                        if (campaign.TargetChannels != null && campaign.TargetChannels.Any())
+                        {
+                            channels = campaign.TargetChannels.ToList();
+                            instructionParts.Add($"Canales objetivo: {string.Join(", ", channels)}");
+                        }
+                        else
+                        {
+                            channels = request.Channels ?? new List<string> { "instagram" };
+                        }
+
+                        // Construir instrucción final
+                        instruction = request.Instruction ?? string.Join(". ", instructionParts);
+                        
+                        _logger.LogInformation(
+                            "Datos reales de campaña cargados: Name={Name}, Channels={Channels}, Instruction={Instruction}",
+                            campaign.Name, string.Join(", ", channels), instruction);
+                    }
+                    else
+                    {
+                        // Campaña no encontrada, usar valores por defecto
+                        _logger.LogWarning(
+                            "Campaña {CampaignId} no encontrada, usando valores por defecto",
+                            request.CampaignId.Value);
+                        instruction = request.Instruction ?? "Prueba de webhook desde frontend - Crear contenido de marketing para Instagram";
+                        channels = request.Channels ?? new List<string> { "instagram" };
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error al cargar datos de campaña {CampaignId}, usando valores por defecto", request.CampaignId.Value);
+                    instruction = request.Instruction ?? "Prueba de webhook desde frontend - Crear contenido de marketing para Instagram";
+                    channels = request.Channels ?? new List<string> { "instagram" };
+                }
+            }
+            else
+            {
+                // No hay campaignId, usar valores del request o por defecto
+                instruction = request.Instruction ?? "Prueba de webhook desde frontend - Crear contenido de marketing para Instagram";
+                channels = request.Channels ?? new List<string> { "instagram" };
+            }
+
             // Usar el servicio de automatización para disparar el webhook
             var automationService = HttpContext.RequestServices.GetRequiredService<IExternalAutomationService>();
             
             // Crear eventData como Dictionary para marketing.request
             // IMPORTANTE: Las claves deben estar en minúsculas como espera n8n
+            // Esto es EXACTAMENTE igual a como se envía desde MarketingRequestController.Create
             var eventData = new Dictionary<string, object>
             {
-                { "instruction", request.Instruction ?? "Prueba de webhook desde frontend - Crear contenido de marketing para Instagram" },
-                { "channels", request.Channels ?? new List<string> { "instagram" } },
-                { "requiresApproval", request.RequiresApproval ?? false },
-                { "assets", request.Assets ?? new List<string>() }
+                { "instruction", instruction },
+                { "channels", channels },
+                { "requiresApproval", requiresApproval },
+                { "assets", assets }
             };
 
+            _logger.LogInformation(
+                "=== PRUEBA MANUAL DE WEBHOOK MARKETING REQUEST ===");
+            _logger.LogInformation(
+                "TenantId={TenantId}, UserId={UserId}, CampaignId={CampaignId}, UsingRealData={UsingRealData}",
+                tenantId.Value, userId.Value, request.CampaignId?.ToString() ?? "NULL", usingRealCampaignData);
+            _logger.LogInformation(
+                "Instruction={Instruction}, Channels={Channels}, RequiresApproval={RequiresApproval}, Assets={Assets}",
+                instruction, string.Join(", ", channels), requiresApproval, string.Join(", ", assets));
+
+            // Pasar campaignId si está presente (igual que en MarketingRequestController)
             var requestId = await automationService.TriggerAutomationAsync(
                 tenantId.Value,
                 "marketing.request",
                 eventData,
                 userId,
-                null,
+                request.CampaignId, // ← Agregar campaignId opcional
                 null,
                 CancellationToken.None);
+
+            _logger.LogInformation(
+                "Webhook disparado exitosamente. RequestId={RequestId}", requestId);
+
+            var message = request.CampaignId.HasValue
+                ? $"Webhook disparado correctamente. RequestId: {requestId}. Asociado a CampaignId: {request.CampaignId}. {(usingRealCampaignData ? "✓ Usando datos reales de la campaña" : "⚠ Campaña no encontrada, usando valores por defecto")}"
+                : $"Webhook disparado correctamente. RequestId: {requestId}";
 
             return Json(new 
             { 
                 success = true, 
-                message = "Webhook disparado correctamente",
-                requestId = requestId
+                message = message,
+                requestId = requestId,
+                campaignId = request.CampaignId?.ToString(),
+                usingRealData = usingRealCampaignData,
+                instruction = instruction,
+                channels = channels
             });
         }
         catch (Exception ex)
@@ -393,4 +539,8 @@ public class TestWebhookRequest
     /// TenantId opcional para SuperAdmins (permite especificar el tenant a probar).
     /// </summary>
     public Guid? TenantId { get; set; }
+    /// <summary>
+    /// CampaignId opcional para asociar la solicitud a una campaña (igual que en MarketingRequestController).
+    /// </summary>
+    public Guid? CampaignId { get; set; }
 }

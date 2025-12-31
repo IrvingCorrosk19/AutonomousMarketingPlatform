@@ -132,6 +132,20 @@
                             </div>
 
                             <div class="form-group">
+                                <label for="testCampaignId">
+                                    <i class="fas fa-bullhorn mr-1"></i>Campaign ID (Opcional - usar datos reales de la campaña):
+                                </label>
+                                <input type="text" class="form-control" id="testCampaignId" 
+                                       placeholder="Ej: 73f24df7-644a-4895-865b-0a507926b97e" 
+                                       style="max-width: 400px;">
+                                <small class="form-text text-muted">
+                                    <strong>Si ingresas un Campaign ID:</strong> El sistema cargará automáticamente los datos reales de la campaña 
+                                    (nombre, descripción, objetivos, audiencia objetivo, canales) y los usará para construir la instrucción del webhook. 
+                                    <br><strong>Si dejas vacío:</strong> Se enviará una instrucción de prueba genérica.
+                                </small>
+                            </div>
+
+                            <div class="form-group">
                                 <button type="button" class="btn btn-info" id="testConnectionBtn">
                                     <i class="fas fa-network-wired mr-2"></i>Probar Conexión
                                 </button>
@@ -415,10 +429,12 @@
             // Obtener tenantId seleccionado si es SuperAdmin
             var selectedTenantId = '@(ViewBag.SelectedTenantId != null ? ViewBag.SelectedTenantId.ToString() : "")';
             var isSuperAdmin = @(ViewBag.IsSuperAdmin == true ? "true" : "false");
+            
+            // Obtener campaignId del campo de entrada (opcional)
+            var campaignIdInput = $('#testCampaignId').val().trim();
+            var hasCampaignId = false;
 
             var requestData = {
-                instruction: 'Prueba de webhook desde el frontend - Crear contenido de marketing para Instagram',
-                channels: ['instagram'],
                 requiresApproval: false,
                 assets: []
             };
@@ -426,6 +442,26 @@
             // Si es SuperAdmin y hay un tenantId seleccionado, incluirlo en el request
             if (isSuperAdmin && selectedTenantId && selectedTenantId !== '') {
                 requestData.tenantId = selectedTenantId;
+            }
+            
+            // Si hay un campaignId ingresado, validarlo y agregarlo
+            // NO enviar instruction ni channels - el backend los generará desde los datos reales de la campaña
+            if (campaignIdInput && campaignIdInput !== '') {
+                // Validar formato GUID básico
+                var guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                if (guidRegex.test(campaignIdInput)) {
+                    requestData.campaignId = campaignIdInput;
+                    hasCampaignId = true;
+                    // NO incluir instruction ni channels - el backend los generará desde la campaña
+                } else {
+                    alert('El Campaign ID no tiene un formato válido (GUID). Se enviará sin campaignId.');
+                }
+            }
+            
+            // Solo agregar instruction y channels si NO hay campaignId (valores por defecto para prueba sin campaña)
+            if (!hasCampaignId) {
+                requestData.instruction = 'Prueba de webhook desde el frontend - Crear contenido de marketing para Instagram';
+                requestData.channels = ['instagram'];
             }
 
             $.ajax({
@@ -438,12 +474,24 @@
                     resultDiv.show();
 
                     if (response.success) {
+                        var realDataBadge = response.usingRealData 
+                            ? '<span class="badge badge-success ml-2"><i class="fas fa-check"></i> Usando datos reales de la campaña</span>'
+                            : '';
+                        var instructionInfo = response.instruction 
+                            ? `<br><strong>Instrucción enviada:</strong><br><small class="text-muted">${response.instruction}</small>`
+                            : '';
+                        var channelsInfo = response.channels && response.channels.length > 0
+                            ? `<br><strong>Canales:</strong> ${response.channels.join(', ')}`
+                            : '';
+                        
                         resultDiv.html(`
                             <div class="alert alert-success">
                                 <i class="fas fa-check-circle mr-2"></i>
-                                <strong>¡Webhook disparado exitosamente!</strong><br>
+                                <strong>¡Webhook disparado exitosamente!</strong>${realDataBadge}<br>
                                 ${response.message}<br>
                                 <small>Request ID: ${response.requestId}</small>
+                                ${instructionInfo}
+                                ${channelsInfo}
                             </div>
                         `);
                     } else {

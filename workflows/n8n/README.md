@@ -191,7 +191,7 @@ Workflow que valida los consentimientos del usuario antes de continuar con el fl
 
 **Notas:**
 - El workflow consulta al backend mediante HTTP GET a `/api/consents/check?tenantId=xxx&userId=yyy`
-- Requiere que el backend tenga configurada la variable de entorno `BACKEND_URL` o usa `http://localhost:5000` por defecto
+- Requiere que el backend tenga configurada la variable de entorno `BACKEND_URL` o usa `http://localhost:56610` por defecto
 - Valida tanto la respuesta HTTP como los valores de los consentimientos
 
 ### 03-load-marketing-memory.json
@@ -848,7 +848,7 @@ Workflow que maneja el flujo de aprobación humana del MarketingPack. Decide si 
 - Si requiere aprobación, envía al backend mediante HTTP POST a `/api/marketing-packs`
 - El estado se marca como "RequiresApproval" en el backend
 - Si no requiere aprobación, el pack se pasa al siguiente workflow para publicación
-- Requiere que el backend tenga configurada la variable de entorno `BACKEND_URL` o usa `http://localhost:5000` por defecto
+- Requiere que el backend tenga configurada la variable de entorno `BACKEND_URL` o usa `http://localhost:56610` por defecto
 
 ### 10-publish-content.json
 **Publish Content**
@@ -909,7 +909,7 @@ Workflow que publica contenido en redes sociales (Instagram, Facebook, TikTok) y
 
 **Notas:**
 - Usa IF Nodes para bifurcar según el canal
-- Requiere variable de entorno `BACKEND_URL` (default: `http://localhost:5000`)
+- Requiere variable de entorno `BACKEND_URL` (default: `http://localhost:56610`)
 - Variables opcionales para APIs reales:
   - `INSTAGRAM_API_URL`, `INSTAGRAM_ACCESS_TOKEN`
   - `FACEBOOK_API_URL`, `FACEBOOK_ACCESS_TOKEN`
@@ -989,7 +989,7 @@ Workflow que guarda métricas iniciales y aprendizajes en memoria al final del p
 - Guarda métricas iniciales (pueden actualizarse después con datos reales)
 - Guarda aprendizajes para mejorar futuras generaciones
 - Asocia todo a tenant y campaña para tracking
-- Requiere variable de entorno `BACKEND_URL` (default: `http://localhost:5000`)
+- Requiere variable de entorno `BACKEND_URL` (default: `http://localhost:56610`)
 
 ## Próximos Workflows
 

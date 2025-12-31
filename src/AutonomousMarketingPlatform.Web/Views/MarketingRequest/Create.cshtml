@@ -1,7 +1,14 @@
 @model AutonomousMarketingPlatform.Web.Controllers.MarketingRequestDto
 @{
     ViewData["Title"] = "Solicitar Contenido de Marketing";
+    Layout = "~/Views/Shared/_Layout.cshtml";
     var campaignId = ViewBag.CampaignId as Guid?;
+    var model = Model ?? new AutonomousMarketingPlatform.Web.Controllers.MarketingRequestDto
+    {
+        CampaignId = campaignId,
+        Channels = new List<string> { "instagram" },
+        RequiresApproval = false
+    };
 }
 
 <div class="content-wrapper">
@@ -42,6 +49,7 @@
                             </h3>
                         </div>
                         <form asp-action="Create" method="post">
+                            @Html.AntiForgeryToken()
                             <div class="card-body">
                                 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
@@ -55,22 +63,22 @@
                                 {
                                     <div class="form-group">
                                         <label>Campaña Asociada</label>
-                                        <input type="text" class="form-control" value="@campaignId.Value" disabled />
+                                        <input type="text" class="form-control" value="@campaignId.Value.ToString()" disabled />
                                         <input type="hidden" asp-for="CampaignId" value="@campaignId.Value" />
                                         <small class="form-text text-muted">Esta solicitud estará asociada a la campaña seleccionada.</small>
                                     </div>
                                 }
                                 else
                                 {
-                                    <input type="hidden" asp-for="CampaignId" />
+                                    <input type="hidden" asp-for="CampaignId" value="" />
                                 }
 
                                 <div class="form-group">
-                                    <label asp-for="Instruction">
+                                    <label for="Instruction">
                                         Instrucción o Descripción <span class="text-danger">*</span>
                                     </label>
-                                    <textarea asp-for="Instruction" class="form-control" rows="5" 
-                                              placeholder="Ejemplo: Crear contenido de marketing para Instagram promocionando nuestro nuevo producto de verano. Enfocarse en público joven de 18-35 años, usar tono casual y divertido."></textarea>
+                                    <textarea id="Instruction" name="Instruction" class="form-control" rows="5" 
+                                              placeholder="Ejemplo: Crear contenido de marketing para Instagram promocionando nuestro nuevo producto de verano. Enfocarse en público joven de 18-35 años, usar tono casual y divertido.">@(model?.Instruction ?? "")</textarea>
                                     <span asp-validation-for="Instruction" class="text-danger"></span>
                                     <small class="form-text text-muted">
                                         Describe detalladamente qué tipo de contenido necesitas. Mientras más específico seas, mejor será el resultado.
@@ -78,14 +86,14 @@
                                 </div>
 
                                 <div class="form-group">
-                                    <label asp-for="Channels">
+                                    <label>
                                         Canales de Publicación <span class="text-danger">*</span>
                                     </label>
                                     <div class="row">
                                         <div class="col-md-3">
                                             <div class="form-check">
                                                 <input class="form-check-input channel-checkbox" type="checkbox" value="instagram" 
-                                                       @(Model.Channels?.Contains("instagram") == true ? "checked" : "") />
+                                                       @(model?.Channels?.Contains("instagram") == true ? "checked" : "") />
                                                 <label class="form-check-label">
                                                     <i class="fab fa-instagram mr-1"></i>Instagram
                                                 </label>
@@ -94,7 +102,7 @@
                                         <div class="col-md-3">
                                             <div class="form-check">
                                                 <input class="form-check-input channel-checkbox" type="checkbox" value="facebook" 
-                                                       @(Model.Channels?.Contains("facebook") == true ? "checked" : "") />
+                                                       @(model?.Channels?.Contains("facebook") == true ? "checked" : "") />
                                                 <label class="form-check-label">
                                                     <i class="fab fa-facebook mr-1"></i>Facebook
                                                 </label>
@@ -103,7 +111,7 @@
                                         <div class="col-md-3">
                                             <div class="form-check">
                                                 <input class="form-check-input channel-checkbox" type="checkbox" value="tiktok" 
-                                                       @(Model.Channels?.Contains("tiktok") == true ? "checked" : "") />
+                                                       @(model?.Channels?.Contains("tiktok") == true ? "checked" : "") />
                                                 <label class="form-check-label">
                                                     <i class="fab fa-tiktok mr-1"></i>TikTok
                                                 </label>
@@ -112,7 +120,7 @@
                                         <div class="col-md-3">
                                             <div class="form-check">
                                                 <input class="form-check-input channel-checkbox" type="checkbox" value="twitter" 
-                                                       @(Model.Channels?.Contains("twitter") == true ? "checked" : "") />
+                                                       @(model?.Channels?.Contains("twitter") == true ? "checked" : "") />
                                                 <label class="form-check-label">
                                                     <i class="fab fa-twitter mr-1"></i>Twitter
                                                 </label>
@@ -120,14 +128,15 @@
                                         </div>
                                     </div>
                                     <input type="hidden" id="ChannelsJson" name="ChannelsJson" />
-                                    <span asp-validation-for="Channels" class="text-danger"></span>
+                                    <span class="text-danger field-validation-valid" data-valmsg-for="Channels" data-valmsg-replace="true"></span>
                                     <small class="form-text text-muted">Selecciona al menos un canal donde se publicará el contenido.</small>
                                 </div>
 
                                 <div class="form-group">
                                     <div class="form-check">
-                                        <input asp-for="RequiresApproval" class="form-check-input" type="checkbox" />
-                                        <label asp-for="RequiresApproval" class="form-check-label">
+                                        <input id="RequiresApproval" name="RequiresApproval" class="form-check-input" type="checkbox" value="true" @(model?.RequiresApproval == true ? "checked" : "") />
+                                        <input type="hidden" name="RequiresApproval" value="false" />
+                                        <label for="RequiresApproval" class="form-check-label">
                                             Requiere aprobación manual antes de publicar
                                         </label>
                                         <small class="form-text text-muted d-block">
@@ -138,9 +147,9 @@
                                 </div>
 
                                 <div class="form-group">
-                                    <label asp-for="AssetsText">URLs de Assets (Opcional)</label>
-                                    <textarea asp-for="AssetsText" class="form-control" rows="3" 
-                                              placeholder="https://ejemplo.com/imagen1.jpg&#10;https://ejemplo.com/video1.mp4">@(Model.AssetsText ?? (Model.Assets != null ? string.Join("\n", Model.Assets) : ""))</textarea>
+                                    <label for="AssetsText">URLs de Assets (Opcional)</label>
+                                    <textarea id="AssetsText" name="AssetsText" class="form-control" rows="3" 
+                                              placeholder="https://ejemplo.com/imagen1.jpg&#10;https://ejemplo.com/video1.mp4">@(model?.AssetsText ?? (model?.Assets != null ? string.Join("\n", model.Assets) : ""))</textarea>
                                     <small class="form-text text-muted">
                                         Ingresa una URL por línea. Estas imágenes o videos se usarán en el contenido generado.
                                     </small>
@@ -163,7 +172,7 @@
 </div>
 
 @section Scripts {
-    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <partial name="_ValidationScriptsPartial" />
     <script>
         $(document).ready(function() {
             // Actualizar el campo hidden con los canales seleccionados

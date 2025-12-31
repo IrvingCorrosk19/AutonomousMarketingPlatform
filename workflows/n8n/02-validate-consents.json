@@ -1,361 +1,137 @@
 {
-  "name": "Validate Consents",
+  "name": "Validate Consents - Integrated",
   "nodes": [
     {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "validate-consents",
-        "responseMode": "responseNode",
-        "options": {}
-      },
-      "id": "webhook-consents",
-      "name": "Webhook - Receive Request",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
+      "id": "extract-context",
+      "name": "Extract Context Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
       "position": [250, 300],
-      "webhookId": "validate-consents-webhook",
-      "notes": "Recibe tenantId y userId para validar consentimientos"
-    },
-    {
       "parameters": {
         "assignments": {
           "assignments": [
             {
-              "id": "assign-tenant-id",
               "name": "tenantId",
-              "value": "={{ $json.body.tenantId }}",
+              "value": "={{ $json.validatedData?.tenantId ?? $json.tenantId ?? $json.body?.tenantId ?? $json.body?.validatedData?.tenantId }}",
               "type": "string"
             },
             {
-              "id": "assign-user-id",
               "name": "userId",
-              "value": "={{ $json.body.userId }}",
+              "value": "={{ $json.validatedData?.userId ?? $json.userId ?? $json.body?.userId ?? $json.body?.validatedData?.userId }}",
               "type": "string"
             }
           ]
         },
         "options": {}
       },
-      "id": "extract-ids",
-      "name": "Extract tenantId and userId",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.3,
-      "position": [450, 300],
-      "notes": "Extrae tenantId y userId del payload"
+      "notes": "Extrae tenantId y userId desde validatedData (si viene del workflow anterior) o desde el nivel raíz (si viene directamente del webhook)"
     },
     {
-      "parameters": {
-        "method": "GET",
-        "url": "={{ $env.BACKEND_URL || 'http://localhost:5000' }}/api/consents/check",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "tenantId",
-              "value": "={{ $json.tenantId }}"
-            },
-            {
-              "name": "userId",
-              "value": "={{ $json.userId }}"
-            }
-          ]
-        },
-        "options": {
-          "timeout": 10000
-        }
-      },
       "id": "http-request-consents",
       "name": "HTTP Request - Check Consents",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [650, 300],
-      "notes": "Consulta al backend para verificar consentimientos del usuario"
+      "position": [450, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BACKEND_URL || 'http://localhost:56610' }}/api/consents/check",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "tenantId", "value": "={{ $json.tenantId }}" },
+            { "name": "userId", "value": "={{ $json.userId }}" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      }
     },
     {
+      "id": "normalize-consents",
+      "name": "Normalize Consents",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [650, 300],
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
+        "assignments": {
+          "assignments": [
             {
-              "id": "condition-ai-consent",
-              "leftValue": "={{ $json.aiConsent }}",
-              "rightValue": "true",
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
+              "name": "aiConsent",
+              "value": "={{ Boolean($json.aiConsent ?? $json.data?.aiConsent) }}",
+              "type": "boolean"
             },
             {
-              "id": "condition-publishing-consent",
-              "leftValue": "={{ $json.publishingConsent }}",
-              "rightValue": "true",
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
+              "name": "publishingConsent",
+              "value": "={{ Boolean($json.publishingConsent ?? $json.data?.publishingConsent) }}",
+              "type": "boolean"
             }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
+          ]
+        }
+      }
+    },
+    {
       "id": "validate-consents",
       "name": "Validate Consents",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [850, 300],
-      "notes": "Valida que ambos consentimientos (AI y Publishing) sean true"
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.aiConsent }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            },
+            {
+              "leftValue": "={{ $json.publishingConsent }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      }
     },
     {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ { \"success\": false, \"error\": \"Missing required consents\", \"message\": \"User does not have required consents to proceed\", \"details\": { \"tenantId\": $('Extract tenantId and userId').item.json.tenantId, \"userId\": $('Extract tenantId and userId').item.json.userId, \"aiConsent\": $json.aiConsent || false, \"publishingConsent\": $json.publishingConsent || false, \"missingConsents\": [ $json.aiConsent ? null : \"AIGeneration\", $json.publishingConsent ? null : \"AutoPublishing\" ].filter(item => item !== null) } } }}",
-        "options": {
-          "responseCode": 403,
-          "responseHeaders": {
-            "entries": [
-              {
-                "name": "Content-Type",
-                "value": "application/json"
-              }
-            ]
-          }
-        }
-      },
       "id": "respond-consent-error",
       "name": "Respond - Consent Error",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [1050, 200],
-      "notes": "Responde con error 403 si faltan consentimientos requeridos"
-    },
-    {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { \"success\": true, \"message\": \"All required consents validated\", \"data\": { \"tenantId\": $('Extract tenantId and userId').item.json.tenantId, \"userId\": $('Extract tenantId and userId').item.json.userId, \"aiConsent\": $json.aiConsent, \"publishingConsent\": $json.publishingConsent, \"validatedAt\": $now } } }}",
-        "options": {
-          "responseCode": 200,
-          "responseHeaders": {
-            "entries": [
-              {
-                "name": "Content-Type",
-                "value": "application/json"
-              }
-            ]
-          }
-        }
-      },
+        "responseCode": 403,
+        "responseBody": "={{ { success:false, error:'Missing consents', aiConsent:$json.aiConsent, publishingConsent:$json.publishingConsent } }}"
+      }
+    },
+    {
       "id": "respond-consent-success",
       "name": "Respond - Consent Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [1050, 400],
-      "notes": "Responde con éxito 200 si todos los consentimientos están validados"
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "assign-validated-consents",
-              "name": "validatedConsents",
-              "value": "={{ { \"tenantId\": $('Extract tenantId and userId').item.json.tenantId, \"userId\": $('Extract tenantId and userId').item.json.userId, \"aiConsent\": $json.aiConsent, \"publishingConsent\": $json.publishingConsent, \"validatedAt\": $now, \"requestId\": $execution.id } }}",
-              "type": "object"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "set-validated-consents",
-      "name": "Set Validated Consents",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.3,
-      "position": [1250, 400],
-      "notes": "Prepara los datos de consentimientos validados para el siguiente paso"
-    },
-    {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { \"success\": false, \"error\": \"Backend error\", \"message\": \"Failed to check consents from backend\", \"details\": { \"statusCode\": $json.statusCode || \"unknown\", \"error\": $json.error || $json.message || \"Unknown error\" } } }}",
-        "options": {
-          "responseCode": 500,
-          "responseHeaders": {
-            "entries": [
-              {
-                "name": "Content-Type",
-                "value": "application/json"
-              }
-            ]
-          }
-        }
-      },
-      "id": "respond-backend-error",
-      "name": "Respond - Backend Error",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [850, 500],
-      "notes": "Responde con error 500 si falla la consulta al backend"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "condition-has-ai-consent",
-              "leftValue": "={{ $json.aiConsent !== undefined }}",
-              "rightValue": "true",
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
-            },
-            {
-              "id": "condition-has-publishing-consent",
-              "leftValue": "={{ $json.publishingConsent !== undefined }}",
-              "rightValue": "true",
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "check-http-response",
-      "name": "Check HTTP Response",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [850, 400],
-      "notes": "Verifica que la respuesta HTTP del backend contenga los campos de consentimiento"
+        "responseCode": 200,
+        "responseBody": "={{ { success:true, message:'Consents validated', validatedAt:$now } }}"
+      }
     }
   ],
   "connections": {
-    "Webhook - Receive Request": {
-      "main": [
-        [
-          {
-            "node": "Extract tenantId and userId",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extract tenantId and userId": {
-      "main": [
-        [
-          {
-            "node": "HTTP Request - Check Consents",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Extract Context Data": {
+      "main": [[{ "node": "HTTP Request - Check Consents", "type": "main", "index": 0 }]]
     },
     "HTTP Request - Check Consents": {
-      "main": [
-        [
-          {
-            "node": "Check HTTP Response",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Normalize Consents", "type": "main", "index": 0 }]]
     },
-    "Check HTTP Response": {
-      "main": [
-        [
-          {
-            "node": "Respond - Backend Error",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Validate Consents",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Normalize Consents": {
+      "main": [[{ "node": "Validate Consents", "type": "main", "index": 0 }]]
     },
     "Validate Consents": {
       "main": [
-        [
-          {
-            "node": "Respond - Consent Error",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Respond - Consent Success",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Respond - Consent Success": {
-      "main": [
-        [
-          {
-            "node": "Set Validated Consents",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Respond - Consent Error", "type": "main", "index": 0 }],
+        [{ "node": "Respond - Consent Success", "type": "main", "index": 0 }]
       ]
     }
-  },
-  "pinData": {},
-  "settings": {
-    "executionOrder": "v1",
-    "saveDataErrorExecution": "all",
-    "saveDataSuccessExecution": "all",
-    "saveManualExecutions": true,
-    "callerPolicy": "workflowsFromSameOwner",
-    "errorWorkflow": ""
-  },
-  "staticData": null,
-  "tags": [
-    {
-      "createdAt": "2025-01-01T00:00:00.000Z",
-      "updatedAt": "2025-01-01T00:00:00.000Z",
-      "id": "marketing-automation",
-      "name": "Marketing Automation"
-    },
-    {
-      "createdAt": "2025-01-01T00:00:00.000Z",
-      "updatedAt": "2025-01-01T00:00:00.000Z",
-      "id": "validation",
-      "name": "Validation"
-    },
-    {
-      "createdAt": "2025-01-01T00:00:00.000Z",
-      "updatedAt": "2025-01-01T00:00:00.000Z",
-      "id": "consents",
-      "name": "Consents"
-    }
-  ],
-  "triggerCount": 0,
-  "updatedAt": "2025-01-01T00:00:00.000Z",
-  "versionId": "1"
+  }
 }
-
