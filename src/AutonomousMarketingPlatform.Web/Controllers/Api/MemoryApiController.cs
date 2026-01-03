@@ -35,12 +35,124 @@ public class MemoryApiController : ControllerBase
     }
 
     /// <summary>
+    /// Obtiene memorias de marketing por tipo.
+    /// Endpoint usado por workflows n8n para obtener memorias específicas.
+    /// </summary>
+    /// <param name="tenantId">ID del tenant (requerido)</param>
+    /// <param name="memoryType">Tipo de memoria (opcional, ej: "Pattern", "Learning")</param>
+    /// <param name="tags">Tags para filtrar (opcional)</param>
+    /// <param name="limit">Límite de resultados (opcional)</param>
+    /// <param name="cancellationToken">Token de cancelación</param>
+    /// <returns>Lista de memorias</returns>
+    /// <response code="200">Lista de memorias</response>
+    /// <response code="400">Si los parámetros son inválidos</response>
+    /// <response code="500">Error interno del servidor</response>
+    [HttpGet]
+    [ProducesResponseType(typeof(List<MarketingMemoryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetMemories(
+        [FromQuery] Guid tenantId,
+        [FromQuery] string? memoryType = null,
+        [FromQuery] string? tags = null,
+        [FromQuery] int? limit = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (tenantId == Guid.Empty)
+            {
+                _logger.LogWarning("GetMemories llamado con tenantId vacío");
+                return BadRequest(new { error = "tenantId is required and must be a valid GUID" });
+            }
+
+            // Usar el servicio para obtener memorias
+            var memoryContext = await _memoryService.GetMemoryContextForAIAsync(
+                tenantId,
+                null,
+                null,
+                null,
+                cancellationToken);
+
+            var memories = new List<MarketingMemoryDto>();
+
+            // Filtrar por tipo de memoria
+            if (!string.IsNullOrWhiteSpace(memoryType))
+            {
+                if (memoryType.Equals("Pattern", StringComparison.OrdinalIgnoreCase))
+                {
+                    memories = memoryContext.Learnings
+                        .Where(m => m.MemoryType.Equals("Pattern", StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                }
+                else if (memoryType.Equals("Learning", StringComparison.OrdinalIgnoreCase))
+                {
+                    memories = memoryContext.Learnings
+                        .Where(m => m.MemoryType.Equals("Learning", StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                }
+                else
+                {
+                    memories = memoryContext.Learnings
+                        .Where(m => m.MemoryType.Equals(memoryType, StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                }
+            }
+            else
+            {
+                memories = memoryContext.Learnings.ToList();
+            }
+
+            // Filtrar por tags si se proporciona
+            if (!string.IsNullOrWhiteSpace(tags))
+            {
+                var tagList = tags.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(t => t.Trim())
+                    .ToList();
+                memories = memories.Where(m => 
+                    m.Tags.Any(t => tagList.Any(tag => t.Contains(tag, StringComparison.OrdinalIgnoreCase))))
+                    .ToList();
+            }
+
+            // Aplicar límite
+            if (limit.HasValue && limit.Value > 0)
+            {
+                memories = memories.Take(limit.Value).ToList();
+            }
+
+            _logger.LogInformation(
+                "Memories retrieved for Tenant {TenantId}: Type={MemoryType}, Count={Count}",
+                tenantId,
+                memoryType ?? "All",
+                memories.Count);
+
+            return Ok(memories);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Error al obtener memorias para Tenant {TenantId}",
+                tenantId);
+
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new
+                {
+                    error = "Internal server error",
+                    message = "Failed to get memories"
+                });
+        }
+    }
+
+    /// <summary>
     /// Obtiene el contexto de memoria de marketing para un tenant.
     /// Endpoint usado por workflows n8n para cargar preferencias, aprendizajes y restricciones.
     /// </summary>
     /// <param name="tenantId">ID del tenant</param>
     /// <param name="userId">ID del usuario (opcional)</param>
     /// <param name="campaignId">ID de la campaña (opcional)</param>
+    /// <param name="memoryType">Tipo de memoria a filtrar (opcional: Preference, Learning, Feedback, Pattern)</param>
     /// <param name="cancellationToken">Token de cancelación</param>
     /// <returns>Contexto de memoria con preferencias, conversaciones, campañas y aprendizajes</returns>
     /// <response code="200">Retorna el contexto de memoria</response>
@@ -54,6 +166,7 @@ public class MemoryApiController : ControllerBase
         [FromQuery] Guid tenantId,
         [FromQuery] Guid? userId = null,
         [FromQuery] Guid? campaignId = null,
+        [FromQuery] string? memoryType = null,
         CancellationToken cancellationToken = default)
     {
         try
@@ -73,16 +186,74 @@ public class MemoryApiController : ControllerBase
                 null,
                 cancellationToken);
 
-            // Extraer preferencias, aprendizajes y restricciones de la memoria
-            var preferences = ExtractPreferences(memoryContext);
-            var learnings = ExtractLearnings(memoryContext);
-            var restrictions = ExtractRestrictions(memoryContext);
-
-            var response = new MemoryContextResponse
+            // Si se especifica memoryType, filtrar las memorias
+            if (!string.IsNullOrWhiteSpace(memoryType))
             {
-                Preferences = preferences,
-                Learnings = learnings,
-                Restrictions = restrictions,
+                // Filtrar UserPreferences, CampaignMemories y Learnings por memoryType
+                var filteredUserPreferences = memoryContext.UserPreferences
+                    .Where(m => m.MemoryType.Equals(memoryType, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                
+                var filteredCampaignMemories = memoryContext.CampaignMemories
+                    .Where(m => m.MemoryType.Equals(memoryType, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                
+                var filteredLearnings = memoryContext.Learnings
+                    .Where(m => m.MemoryType.Equals(memoryType, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                // Crear contexto filtrado
+                var filteredRecentConversations = memoryContext.RecentConversations
+                    .Where(m => m.MemoryType.Equals(memoryType, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                
+                var filteredContext = new MemoryContextForAI
+                {
+                    UserPreferences = filteredUserPreferences,
+                    RecentConversations = filteredRecentConversations,
+                    CampaignMemories = filteredCampaignMemories,
+                    Learnings = filteredLearnings,
+                    SummarizedContext = memoryContext.SummarizedContext
+                };
+
+                // Extraer preferencias, aprendizajes y restricciones del contexto filtrado
+                var preferences = ExtractPreferences(filteredContext);
+                var learnings = ExtractLearnings(filteredContext);
+                var restrictions = ExtractRestrictions(filteredContext);
+
+                var response = new MemoryContextResponse
+                {
+                    Preferences = preferences,
+                    Learnings = learnings,
+                    Restrictions = restrictions,
+                    UserPreferences = filteredUserPreferences,
+                    RecentConversations = filteredContext.RecentConversations,
+                    CampaignMemories = filteredCampaignMemories,
+                    LearningsList = filteredLearnings,
+                    SummarizedContext = filteredContext.SummarizedContext
+                };
+
+                _logger.LogInformation(
+                    "Memory context loaded for Tenant {TenantId} with MemoryType filter {MemoryType}: Preferences={PrefCount}, Learnings={LearnCount}, Restrictions={RestCount}",
+                    tenantId,
+                    memoryType,
+                    preferences.Count,
+                    learnings.Count,
+                    restrictions.Count);
+
+                return Ok(response);
+            }
+
+            // Si no se especifica memoryType, retornar todo el contexto
+            var allPreferences = ExtractPreferences(memoryContext);
+            var allLearnings = ExtractLearnings(memoryContext);
+            var allRestrictions = ExtractRestrictions(memoryContext);
+
+            var fullResponse = new MemoryContextResponse
+            {
+                Preferences = allPreferences,
+                Learnings = allLearnings,
+                Restrictions = allRestrictions,
                 UserPreferences = memoryContext.UserPreferences,
                 RecentConversations = memoryContext.RecentConversations,
                 CampaignMemories = memoryContext.CampaignMemories,
@@ -93,11 +264,11 @@ public class MemoryApiController : ControllerBase
             _logger.LogInformation(
                 "Memory context loaded for Tenant {TenantId}: Preferences={PrefCount}, Learnings={LearnCount}, Restrictions={RestCount}",
                 tenantId,
-                preferences.Count,
-                learnings.Count,
-                restrictions.Count);
+                allPreferences.Count,
+                allLearnings.Count,
+                allRestrictions.Count);
 
-            return Ok(response);
+            return Ok(fullResponse);
         }
         catch (Exception ex)
         {

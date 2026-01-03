@@ -2,6 +2,7 @@ using AutonomousMarketingPlatform.Domain.Entities;
 using AutonomousMarketingPlatform.Domain.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Linq;
 using System.Text.Json;
 
 namespace AutonomousMarketingPlatform.Web.Controllers.Api;
@@ -32,6 +33,93 @@ public class PublishingJobsApiController : ControllerBase
         _publishingJobRepository = publishingJobRepository;
         _unitOfWork = unitOfWork;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Obtiene PublishingJobs con filtros.
+    /// Endpoint usado por workflows n8n para obtener jobs publicados.
+    /// </summary>
+    /// <param name="tenantId">ID del tenant (requerido)</param>
+    /// <param name="publishedAfter">Fecha mínima de publicación (opcional)</param>
+    /// <param name="status">Estado del job (opcional, ej: "Success")</param>
+    /// <param name="campaignId">ID de la campaña (opcional)</param>
+    /// <param name="cancellationToken">Token de cancelación</param>
+    /// <returns>Lista de PublishingJobs</returns>
+    /// <response code="200">Lista de PublishingJobs</response>
+    /// <response code="400">Si los parámetros son inválidos</response>
+    /// <response code="500">Error interno del servidor</response>
+    [HttpGet]
+    [ProducesResponseType(typeof(List<PublishingJobResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetPublishingJobs(
+        [FromQuery] Guid tenantId,
+        [FromQuery] DateTime? publishedAfter = null,
+        [FromQuery] string? status = null,
+        [FromQuery] Guid? campaignId = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (tenantId == Guid.Empty)
+            {
+                return BadRequest(new { error = "tenantId is required and must be a valid GUID" });
+            }
+
+            var allJobs = await _publishingJobRepository.GetAllAsync(tenantId, cancellationToken);
+
+            // Aplicar filtros
+            var filteredJobs = allJobs.AsEnumerable();
+
+            if (publishedAfter.HasValue)
+            {
+                filteredJobs = filteredJobs.Where(j => j.PublishedDate.HasValue && 
+                    j.PublishedDate.Value >= publishedAfter.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                filteredJobs = filteredJobs.Where(j => j.Status.Equals(status, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (campaignId.HasValue && campaignId.Value != Guid.Empty)
+            {
+                filteredJobs = filteredJobs.Where(j => j.CampaignId == campaignId.Value);
+            }
+
+            var results = filteredJobs.OrderByDescending(j => j.PublishedDate ?? j.CreatedAt).ToList();
+
+            var responses = results.Select(job => new PublishingJobResponse
+            {
+                Id = job.Id,
+                TenantId = job.TenantId,
+                CampaignId = job.CampaignId,
+                MarketingPackId = job.MarketingPackId,
+                GeneratedCopyId = job.GeneratedCopyId,
+                Channel = job.Channel,
+                Status = job.Status,
+                PublishedDate = job.PublishedDate,
+                PublishedUrl = job.PublishedUrl,
+                ExternalPostId = job.ExternalPostId,
+                CreatedAt = job.CreatedAt
+            }).ToList();
+
+            return Ok(responses);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Error al obtener PublishingJobs");
+
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new
+                {
+                    error = "Internal server error",
+                    message = "Failed to get publishing jobs"
+                });
+        }
     }
 
     /// <summary>

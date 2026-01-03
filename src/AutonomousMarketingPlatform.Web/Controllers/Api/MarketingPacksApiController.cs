@@ -4,6 +4,7 @@ using AutonomousMarketingPlatform.Domain.Entities;
 using AutonomousMarketingPlatform.Domain.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Linq;
 using System.Text.Json;
 
 namespace AutonomousMarketingPlatform.Web.Controllers.Api;
@@ -40,6 +41,148 @@ public class MarketingPacksApiController : ControllerBase
         _assetPromptRepository = assetPromptRepository;
         _unitOfWork = unitOfWork;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Obtiene un MarketingPack por ID o lista packs con filtros.
+    /// Endpoint usado por workflows n8n para obtener packs existentes.
+    /// </summary>
+    /// <param name="id">ID del MarketingPack (opcional)</param>
+    /// <param name="tenantId">ID del tenant (requerido si no se proporciona id)</param>
+    /// <param name="orderBy">Campo para ordenar (opcional, ej: "cognitiveVersion")</param>
+    /// <param name="limit">Límite de resultados (opcional)</param>
+    /// <param name="cancellationToken">Token de cancelación</param>
+    /// <returns>MarketingPack(s) encontrado(s)</returns>
+    /// <response code="200">MarketingPack(s) encontrado(s)</response>
+    /// <response code="400">Si los parámetros son inválidos</response>
+    /// <response code="404">Si no se encuentra el pack (cuando se busca por ID)</response>
+    /// <response code="500">Error interno del servidor</response>
+    [HttpGet]
+    [ProducesResponseType(typeof(MarketingPackResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(List<MarketingPackResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetMarketingPack(
+        [FromQuery] Guid? id = null,
+        [FromQuery] Guid? tenantId = null,
+        [FromQuery] string? orderBy = null,
+        [FromQuery] int? limit = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Si se proporciona ID, buscar pack específico
+            if (id.HasValue && id.Value != Guid.Empty)
+            {
+                var packs = await _marketingPackRepository.FindAsync(
+                    p => p.Id == id.Value,
+                    tenantId ?? Guid.Empty,
+                    cancellationToken);
+                
+                var pack = packs.FirstOrDefault();
+                if (pack == null)
+                {
+                    return NotFound(new { error = "MarketingPack not found" });
+                }
+
+                var response = new MarketingPackResponse
+                {
+                    Id = pack.Id,
+                    TenantId = pack.TenantId,
+                    UserId = pack.UserId,
+                    ContentId = pack.ContentId,
+                    CampaignId = pack.CampaignId,
+                    Strategy = pack.Strategy,
+                    Status = pack.Status,
+                    Version = pack.Version,
+                    Metadata = pack.Metadata,
+                    CreatedAt = pack.CreatedAt
+                };
+
+                return Ok(response);
+            }
+
+            // Si no se proporciona ID, listar packs con filtros
+            if (!tenantId.HasValue || tenantId.Value == Guid.Empty)
+            {
+                return BadRequest(new { error = "tenantId is required when id is not provided" });
+            }
+
+            var allPacks = await _marketingPackRepository.GetAllAsync(
+                tenantId.Value,
+                cancellationToken);
+
+            // Aplicar ordenamiento
+            IEnumerable<MarketingPack> orderedPacks = allPacks;
+            if (!string.IsNullOrWhiteSpace(orderBy))
+            {
+                if (orderBy.Equals("cognitiveVersion", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Extraer cognitiveVersion del Metadata si existe
+                    orderedPacks = allPacks.OrderByDescending(p =>
+                    {
+                        if (p.Metadata != null && p.Metadata.Contains("cognitiveVersion"))
+                        {
+                            try
+                            {
+                                var parts = p.Metadata.Split(new[] { "\"cognitiveVersion\":" }, StringSplitOptions.None);
+                                if (parts.Length > 1)
+                                {
+                                    var value = parts[1].Split(',')[0].Trim();
+                                    if (int.TryParse(value, out int version))
+                                        return version;
+                                }
+                            }
+                            catch { }
+                        }
+                        return 0;
+                    });
+                }
+                else if (orderBy.Equals("createdAt", StringComparison.OrdinalIgnoreCase))
+                {
+                    orderedPacks = allPacks.OrderByDescending(p => p.CreatedAt);
+                }
+            }
+            else
+            {
+                orderedPacks = allPacks.OrderByDescending(p => p.CreatedAt);
+            }
+
+            // Aplicar límite
+            var results = limit.HasValue && limit.Value > 0
+                ? orderedPacks.Take(limit.Value).ToList()
+                : orderedPacks.ToList();
+            var responses = results.Select(pack => new MarketingPackResponse
+            {
+                Id = pack.Id,
+                TenantId = pack.TenantId,
+                UserId = pack.UserId,
+                ContentId = pack.ContentId,
+                CampaignId = pack.CampaignId,
+                Strategy = pack.Strategy,
+                Status = pack.Status,
+                Version = pack.Version,
+                Metadata = pack.Metadata,
+                CreatedAt = pack.CreatedAt
+            }).ToList();
+
+            return Ok(responses);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Error al obtener MarketingPack(s)");
+
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new
+                {
+                    error = "Internal server error",
+                    message = "Failed to get marketing pack(s)"
+                });
+        }
     }
 
     /// <summary>
