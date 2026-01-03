@@ -223,42 +223,42 @@
                                                                                  },
                                                                                  {
                                                                                      "name":  "tenantId",
-                                                                                     "value":  "={{ $json.tenantId }}",
+                                                                                     "value":  "={{ $json.body?.tenantId ?? $json.tenantId }}",
                                                                                      "type":  "string"
                                                                                  },
                                                                                  {
                                                                                      "name":  "userId",
-                                                                                     "value":  "={{ $json.userId }}",
+                                                                                     "value":  "={{ $json.body?.userId ?? $json.userId }}",
                                                                                      "type":  "string"
                                                                                  },
                                                                                  {
                                                                                      "name":  "campaignId",
-                                                                                     "value":  "={{ $json.campaignId ?? null }}",
+                                                                                     "value":  "={{ $json.body?.campaignId ?? $json.campaignId ?? null }}",
                                                                                      "type":  "string"
                                                                                  },
                                                                                  {
                                                                                      "name":  "instruction",
-                                                                                     "value":  "={{ $json.instruction }}",
+                                                                                     "value":  "={{ $json.body?.instruction ?? $json.instruction }}",
                                                                                      "type":  "string"
                                                                                  },
                                                                                  {
                                                                                      "name":  "channels",
-                                                                                     "value":  "={{ $json.channels }}",
+                                                                                     "value":  "={{ $json.body?.channels ?? $json.channels }}",
                                                                                      "type":  "array"
                                                                                  },
                                                                                  {
                                                                                      "name":  "assets",
-                                                                                     "value":  "={{ $json.assets }}",
+                                                                                     "value":  "={{ $json.body?.assets ?? $json.assets }}",
                                                                                      "type":  "array"
                                                                                  },
                                                                                  {
                                                                                      "name":  "requiresApproval",
-                                                                                     "value":  "={{ $json.requiresApproval }}",
+                                                                                     "value":  "={{ $json.body?.requiresApproval ?? $json.requiresApproval }}",
                                                                                      "type":  "boolean"
                                                                                  },
                                                                                  {
                                                                                      "name":  "validatedData",
-                                                                                     "value":  "={{ $json.validatedData }}",
+                                                                                     "value":  "={{ $json.body?.validatedData ?? $json.validatedData }}",
                                                                                      "type":  "object"
                                                                                  }
                                                                              ]
@@ -285,11 +285,11 @@
                                                                  "parameters":  [
                                                                                     {
                                                                                         "name":  "tenantId",
-                                                                                        "value":  "={{ $('Set Cognitive Engine Version').item.json.tenantId }}"
+                                                                                        "value":  "={{ $json.body?.tenantId ?? $json.tenantId ?? $('Set Cognitive Engine Version').item.json.tenantId }}"
                                                                                     },
                                                                                     {
                                                                                         "name":  "userId",
-                                                                                        "value":  "={{ $('Set Cognitive Engine Version').item.json.userId }}"
+                                                                                        "value":  "={{ $json.body?.userId ?? $json.userId ?? $('Set Cognitive Engine Version').item.json.userId }}"
                                                                                     }
                                                                                 ]
                                                              },
