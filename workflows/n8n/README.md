@@ -217,7 +217,7 @@ Workflow que carga la memoria histórica de marketing de un tenant para usar en 
 }
 ```
 
-**Respuesta del Backend (GET /api/memory/context?tenantId=xxx):**
+**Respuesta del Backend (GET /api/MemoryApi/context?tenantId=xxx):**
 ```json
 {
   "preferences": {
@@ -257,7 +257,7 @@ Workflow que carga la memoria histórica de marketing de un tenant para usar en 
 ```
 
 **Notas:**
-- El workflow consulta al backend mediante HTTP GET a `/api/memory/context?tenantId=xxx`
+- El workflow consulta al backend mediante HTTP GET a `/api/MemoryApi/context?tenantId=xxx`
 - Normaliza la respuesta para facilitar su uso en workflows posteriores
 - Extrae automáticamente preferencias, aprendizajes y restricciones de la memoria
 
@@ -982,7 +982,7 @@ Workflow que guarda métricas iniciales y aprendizajes en memoria al final del p
 **Endpoints del Backend:**
 - `POST /api/metrics/campaign` - Guarda métricas de campaña
 - `POST /api/metrics/publishing-job` - Guarda métricas de publicación
-- `POST /api/memory/save` - Guarda aprendizaje en memoria
+- `POST /api/MemoryApi/save` - Guarda aprendizaje en memoria
 
 **Notas:**
 - Se ejecuta al final del proceso de marketing autónomo

@@ -16,7 +16,7 @@ namespace AutonomousMarketingPlatform.Web.Controllers.Api;
 /// para facilitar la integración con n8n en desarrollo.
 /// </remarks>
 [ApiController]
-[Route("api/memory")]
+[Route("api/[controller]")]
 [AllowAnonymous]
 public class MemoryApiController : ControllerBase
 {

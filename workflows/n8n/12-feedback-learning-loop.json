@@ -118,7 +118,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ ($env.BACKEND_URL && $env.BACKEND_URL !== 'http://localhost:5000') ? $env.BACKEND_URL : 'https://autonomousmarketingplatform.onrender.com' }}/api/memory",
+        "url": "={{ ($env.BACKEND_URL && $env.BACKEND_URL !== 'http://localhost:5000') ? $env.BACKEND_URL : 'https://autonomousmarketingplatform.onrender.com' }}/api/MemoryApi",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
@@ -230,10 +230,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ ($env.BACKEND_URL && $env.BACKEND_URL !== 'http://localhost:5000') ? $env.BACKEND_URL : 'https://autonomousmarketingplatform.onrender.com' }}/api/memory/save",
+        "url": "={{ ($env.BACKEND_URL && $env.BACKEND_URL !== 'http://localhost:5000') ? $env.BACKEND_URL : 'https://autonomousmarketingplatform.onrender.com' }}/api/MemoryApi/save",
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ { \"tenantId\": $json.tenantId, \"campaignId\": $json.campaignId, \"memoryType\": $json.learnings.performanceMemory.memoryType, \"content\": JSON.stringify($json.learnings.performanceMemory.content), \"context\": $json.learnings.performanceMemory.context, \"tags\": ['performance', 'metrics', $json.channel, $json.evaluationTime], \"relevanceScore\": $json.learnings.performanceMemory.relevanceScore } }}",
+        "body": "={{ { \"tenantId\": $json.tenantId, \"campaignId\": $json.campaignId, \"memoryType\": $json.learnings.performanceMemory.memoryType, \"content\": JSON.stringify($json.learnings.performanceMemory.content), \"context\": $json.learnings.performanceMemory.context, \"tags\": ['performance', 'metrics', $json.channel, $json.evaluationTime], \"relevanceScore\": $json.learnings.performanceMemory.relevanceScore, \"cognitiveEngineVersion\": 'v1.0-cognitive-engine' } }}",
         "options": {
           "timeout": 10000
         }
@@ -247,10 +247,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ ($env.BACKEND_URL && $env.BACKEND_URL !== 'http://localhost:5000') ? $env.BACKEND_URL : 'https://autonomousmarketingplatform.onrender.com' }}/api/memory/save",
+        "url": "={{ ($env.BACKEND_URL && $env.BACKEND_URL !== 'http://localhost:5000') ? $env.BACKEND_URL : 'https://autonomousmarketingplatform.onrender.com' }}/api/MemoryApi/save",
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ { \"tenantId\": $json.tenantId, \"campaignId\": $json.campaignId, \"memoryType\": $json.learnings.patternMemory.memoryType, \"content\": JSON.stringify($json.learnings.patternMemory.content), \"context\": $json.learnings.patternMemory.context, \"tags\": ['pattern', $json.result, $json.channel, $json.evaluationTime], \"relevanceScore\": $json.learnings.patternMemory.relevanceScore } }}",
+        "body": "={{ { \"tenantId\": $json.tenantId, \"campaignId\": $json.campaignId, \"memoryType\": $json.learnings.patternMemory.memoryType, \"content\": JSON.stringify($json.learnings.patternMemory.content), \"context\": $json.learnings.patternMemory.context, \"tags\": ['pattern', $json.result, $json.channel, $json.evaluationTime], \"relevanceScore\": $json.learnings.patternMemory.relevanceScore, \"cognitiveEngineVersion\": 'v1.0-cognitive-engine' } }}",
         "options": {
           "timeout": 10000
         }
@@ -292,10 +292,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ ($env.BACKEND_URL && $env.BACKEND_URL !== 'http://localhost:5000') ? $env.BACKEND_URL : 'https://autonomousmarketingplatform.onrender.com' }}/api/memory/save",
+        "url": "={{ ($env.BACKEND_URL && $env.BACKEND_URL !== 'http://localhost:5000') ? $env.BACKEND_URL : 'https://autonomousmarketingplatform.onrender.com' }}/api/MemoryApi/save",
         "sendBody": true,
         "contentType": "json",
-        "body": "={{ { \"tenantId\": $json.tenantId, \"campaignId\": $json.campaignId, \"memoryType\": 'Pattern', \"content\": JSON.stringify({ type: 'cognitive_version_increment', reason: $json.evaluationSummary.summary || 'Learning from campaign results', previousVersion: $json.originalDecision.cognitiveVersion, newVersion: $json.originalDecision.cognitiveVersion + 1, trigger: $json.learnings.shouldIncrementVersion ? 'automatic' : 'manual' }), \"context\": { marketingPackId: $json.marketingPackId, evaluationTime: $json.evaluationTime, result: $json.result }, \"tags\": ['cognitive-version', 'evolution'], \"relevanceScore\": 10 } }}",
+        "body": "={{ { \"tenantId\": $json.tenantId, \"campaignId\": $json.campaignId, \"memoryType\": 'Pattern', \"content\": JSON.stringify({ type: 'cognitive_version_increment', reason: $json.evaluationSummary.summary || 'Learning from campaign results', previousVersion: $json.originalDecision.cognitiveVersion, newVersion: $json.originalDecision.cognitiveVersion + 1, trigger: $json.learnings.shouldIncrementVersion ? 'automatic' : 'manual' }), \"context\": { marketingPackId: $json.marketingPackId, evaluationTime: $json.evaluationTime, result: $json.result }, \"tags\": ['cognitive-version', 'evolution'], \"relevanceScore\": 10, \"cognitiveEngineVersion\": 'v1.0-cognitive-engine' } }}",
         "options": {
           "timeout": 10000
         }
