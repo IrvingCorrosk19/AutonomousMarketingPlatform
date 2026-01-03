@@ -434,7 +434,7 @@
                   {
                       "parameters":  {
                                          "method":  "GET",
-                                         "url":  "https://autonomousmarketingplatform.onrender.com/api/MemoryApi/context",
+                                         "url":  "https://autonomousmarketingplatform.onrender.com/api/Memory/context",
                                          "sendQuery":  true,
                                          "queryParameters":  {
                                                                  "parameters":  [
@@ -527,7 +527,7 @@
                   {
                       "parameters":  {
                                          "method":  "GET",
-                                         "url":  "https://autonomousmarketingplatform.onrender.com/api/MemoryApi/context",
+                                         "url":  "https://autonomousmarketingplatform.onrender.com/api/Memory/context",
                                          "sendQuery":  true,
                                          "queryParameters":  {
                                                                  "parameters":  [
@@ -557,7 +557,7 @@
                   {
                       "parameters":  {
                                          "method":  "GET",
-                                         "url":  "https://autonomousmarketingplatform.onrender.com/api/MemoryApi/context",
+                                         "url":  "https://autonomousmarketingplatform.onrender.com/api/Memory/context",
                                          "sendQuery":  true,
                                          "queryParameters":  {
                                                                  "parameters":  [
@@ -587,7 +587,7 @@
                   {
                       "parameters":  {
                                          "method":  "GET",
-                                         "url":  "https://autonomousmarketingplatform.onrender.com/api/MemoryApi/context",
+                                         "url":  "https://autonomousmarketingplatform.onrender.com/api/Memory/context",
                                          "sendQuery":  true,
                                          "queryParameters":  {
                                                                  "parameters":  [
@@ -617,7 +617,7 @@
                   {
                       "parameters":  {
                                          "method":  "GET",
-                                         "url":  "https://autonomousmarketingplatform.onrender.com/api/MemoryApi/context",
+                                         "url":  "https://autonomousmarketingplatform.onrender.com/api/Memory/context",
                                          "sendQuery":  true,
                                          "queryParameters":  {
                                                                  "parameters":  [
