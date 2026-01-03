@@ -26,37 +26,37 @@
                                                              "assignments":  [
                                                                                  {
                                                                                      "name":  "tenantId",
-                                                                                     "value":  "={{ $json.body.tenantId }}",
+                                                                                     "value":  "={{ $json.body?.tenantId ?? $json.tenantId }}",
                                                                                      "type":  "string"
                                                                                  },
                                                                                  {
                                                                                      "name":  "userId",
-                                                                                     "value":  "={{ $json.body.userId }}",
+                                                                                     "value":  "={{ $json.body?.userId ?? $json.userId }}",
                                                                                      "type":  "string"
                                                                                  },
                                                                                  {
                                                                                      "name":  "instruction",
-                                                                                     "value":  "={{ $json.body.instruction }}",
+                                                                                     "value":  "={{ $json.body?.instruction ?? $json.instruction }}",
                                                                                      "type":  "string"
                                                                                  },
                                                                                  {
                                                                                      "name":  "campaignId",
-                                                                                     "value":  "={{ $json.body.campaignId ?? null }}",
+                                                                                     "value":  "={{ $json.body?.campaignId ?? $json.campaignId ?? null }}",
                                                                                      "type":  "string"
                                                                                  },
                                                                                  {
                                                                                      "name":  "requiresApproval",
-                                                                                     "value":  "={{ Boolean($json.body.requiresApproval) }}",
+                                                                                     "value":  "={{ Boolean($json.body?.requiresApproval ?? $json.requiresApproval ?? false) }}",
                                                                                      "type":  "boolean"
                                                                                  },
                                                                                  {
                                                                                      "name":  "channelsNormalized",
-                                                                                     "value":  "={{ Array.isArray($json.body.channels) ? $json.body.channels : ($json.body.channels ? [$json.body.channels] : []) }}",
+                                                                                     "value":  "={{ (() => { const ch = $json.body?.channels ?? $json.channels ?? []; return Array.isArray(ch) ? ch : (ch ? [ch] : []); })() }}",
                                                                                      "type":  "array"
                                                                                  },
                                                                                  {
                                                                                      "name":  "assets",
-                                                                                     "value":  "={{ Array.isArray($json.body.assets) ? $json.body.assets : ($json.body.assets ? [$json.body.assets] : []) }}",
+                                                                                     "value":  "={{ (() => { const a = $json.body?.assets ?? $json.assets ?? []; return Array.isArray(a) ? a : (a ? [a] : []); })() }}",
                                                                                      "type":  "array"
                                                                                  }
                                                                              ]
