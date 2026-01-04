@@ -76,7 +76,14 @@
                                         }
                                         @foreach (var role in roles)
                                         {
-                                            <option value="@role" selected="@(currentRole == role)">@role</option>
+                                            if (currentRole == role)
+                                            {
+                                                <option value="@role" selected>@role</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@role">@role</option>
+                                            }
                                         }
                                     </select>
                                     <span asp-validation-for="Role" class="text-danger"></span>
@@ -84,7 +91,14 @@
 
                                 <div class="form-group">
                                     <div class="form-check">
-                                        <input asp-for="IsActive" class="form-check-input" type="checkbox" />
+                                        @if (Model?.IsActive == true)
+                                        {
+                                            <input asp-for="IsActive" class="form-check-input" type="checkbox" checked />
+                                        }
+                                        else
+                                        {
+                                            <input asp-for="IsActive" class="form-check-input" type="checkbox" />
+                                        }
                                         <label asp-for="IsActive" class="form-check-label">
                                             Usuario Activo
                                         </label>
