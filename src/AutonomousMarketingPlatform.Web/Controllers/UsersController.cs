@@ -119,9 +119,83 @@ public class UsersController : Controller
             return RedirectToAction("AccessDenied", "Account");
         }
 
+        // Si no es SuperAdmin, obtener TenantId del usuario actual
+        if (!isSuperAdmin)
+        {
+            var tenantId = UserHelper.GetTenantId(User);
+            if (tenantId.HasValue)
+            {
+                model.TenantId = tenantId.Value;
+                _logger.LogInformation("[UsersController.Create] TenantId asignado desde usuario actual: {TenantId}", tenantId.Value);
+            }
+        }
+
+        // Validar que el email no esté vacío
+        if (string.IsNullOrWhiteSpace(model.Email))
+        {
+            _logger.LogWarning("[UsersController.Create] Email vacío");
+            ModelState.AddModelError(nameof(model.Email), "El email es requerido");
+        }
+
+        // Validar que la contraseña no esté vacía
+        if (string.IsNullOrWhiteSpace(model.Password))
+        {
+            _logger.LogWarning("[UsersController.Create] Contraseña vacía");
+            ModelState.AddModelError(nameof(model.Password), "La contraseña es requerida");
+        }
+        else
+        {
+            // Validar que las contraseñas coincidan
+            if (model.Password != model.ConfirmPassword)
+            {
+                _logger.LogWarning("[UsersController.Create] Las contraseñas no coinciden");
+                ModelState.AddModelError(nameof(model.ConfirmPassword), "Las contraseñas no coinciden");
+            }
+            
+            // Validar requisitos de contraseña
+            if (model.Password.Length < 8)
+            {
+                _logger.LogWarning("[UsersController.Create] Contraseña muy corta: {Length} caracteres", model.Password.Length);
+                ModelState.AddModelError(nameof(model.Password), "La contraseña debe tener al menos 8 caracteres");
+            }
+            if (!model.Password.Any(char.IsUpper))
+            {
+                _logger.LogWarning("[UsersController.Create] Contraseña sin mayúsculas");
+                ModelState.AddModelError(nameof(model.Password), "La contraseña debe contener al menos una letra mayúscula");
+            }
+            if (!model.Password.Any(char.IsLower))
+            {
+                _logger.LogWarning("[UsersController.Create] Contraseña sin minúsculas");
+                ModelState.AddModelError(nameof(model.Password), "La contraseña debe contener al menos una letra minúscula");
+            }
+            if (!model.Password.Any(char.IsDigit))
+            {
+                _logger.LogWarning("[UsersController.Create] Contraseña sin números");
+                ModelState.AddModelError(nameof(model.Password), "La contraseña debe contener al menos un número");
+            }
+            if (!model.Password.Any(ch => !char.IsLetterOrDigit(ch)))
+            {
+                _logger.LogWarning("[UsersController.Create] Contraseña sin caracteres especiales");
+                ModelState.AddModelError(nameof(model.Password), "La contraseña debe contener al menos un carácter especial");
+            }
+        }
+
+        // Validar que el tenant no sea Guid.Empty (solo si es SuperAdmin)
+        if (isSuperAdmin && model.TenantId == Guid.Empty)
+        {
+            _logger.LogWarning("[UsersController.Create] TenantId vacío para SuperAdmin");
+            ModelState.AddModelError(nameof(model.TenantId), "Debe seleccionar un tenant");
+        }
+        else if (!isSuperAdmin && model.TenantId == Guid.Empty)
+        {
+            _logger.LogError("[UsersController.Create] TenantId vacío para usuario no SuperAdmin");
+            ModelState.AddModelError("", "No se pudo determinar el tenant. Por favor, contacte al administrador.");
+        }
+
+        // Si hay errores de validación, retornar la vista
         if (!ModelState.IsValid)
         {
-            _logger.LogWarning("[UsersController.Create] ModelState inválido. Errores: {Errors}", 
+            _logger.LogWarning("[UsersController.Create] Validación fallida. Errores: {Errors}", 
                 string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
             
             // Recargar tenants si es SuperAdmin
@@ -136,79 +210,6 @@ public class UsersController : Controller
 
         try
         {
-            // Validar que el email no esté vacío
-            if (string.IsNullOrWhiteSpace(model.Email))
-            {
-                _logger.LogWarning("[UsersController.Create] Email vacío");
-                ModelState.AddModelError(nameof(model.Email), "El email es requerido");
-            }
-
-            // Validar que la contraseña no esté vacía
-            if (string.IsNullOrWhiteSpace(model.Password))
-            {
-                _logger.LogWarning("[UsersController.Create] Contraseña vacía");
-                ModelState.AddModelError(nameof(model.Password), "La contraseña es requerida");
-            }
-            else
-            {
-                // Validar que las contraseñas coincidan
-                if (model.Password != model.ConfirmPassword)
-                {
-                    _logger.LogWarning("[UsersController.Create] Las contraseñas no coinciden");
-                    ModelState.AddModelError(nameof(model.ConfirmPassword), "Las contraseñas no coinciden");
-                }
-                
-                // Validar requisitos de contraseña
-                if (model.Password.Length < 8)
-                {
-                    _logger.LogWarning("[UsersController.Create] Contraseña muy corta: {Length} caracteres", model.Password.Length);
-                    ModelState.AddModelError(nameof(model.Password), "La contraseña debe tener al menos 8 caracteres");
-                }
-                if (!model.Password.Any(char.IsUpper))
-                {
-                    _logger.LogWarning("[UsersController.Create] Contraseña sin mayúsculas");
-                    ModelState.AddModelError(nameof(model.Password), "La contraseña debe contener al menos una letra mayúscula");
-                }
-                if (!model.Password.Any(char.IsLower))
-                {
-                    _logger.LogWarning("[UsersController.Create] Contraseña sin minúsculas");
-                    ModelState.AddModelError(nameof(model.Password), "La contraseña debe contener al menos una letra minúscula");
-                }
-                if (!model.Password.Any(char.IsDigit))
-                {
-                    _logger.LogWarning("[UsersController.Create] Contraseña sin números");
-                    ModelState.AddModelError(nameof(model.Password), "La contraseña debe contener al menos un número");
-                }
-                if (!model.Password.Any(ch => !char.IsLetterOrDigit(ch)))
-                {
-                    _logger.LogWarning("[UsersController.Create] Contraseña sin caracteres especiales");
-                    ModelState.AddModelError(nameof(model.Password), "La contraseña debe contener al menos un carácter especial");
-                }
-            }
-
-            // Validar que el tenant no sea Guid.Empty
-            if (model.TenantId == Guid.Empty)
-            {
-                _logger.LogWarning("[UsersController.Create] TenantId vacío");
-                ModelState.AddModelError(nameof(model.TenantId), "Debe seleccionar un tenant");
-            }
-
-            // Si hay errores de validación, retornar la vista
-            if (!ModelState.IsValid)
-            {
-                _logger.LogWarning("[UsersController.Create] Validación fallida. Errores: {Errors}", 
-                    string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
-                
-                // Recargar tenants si es SuperAdmin
-                if (isSuperAdmin)
-                {
-                    var tenantsQuery = new ListTenantsQuery();
-                    var tenants = await _mediator.Send(tenantsQuery);
-                    ViewBag.Tenants = tenants;
-                }
-                return View(model);
-            }
-            
             _logger.LogInformation("[UsersController.Create] Validación exitosa, creando usuario...");
 
             var command = new CreateUserCommand
