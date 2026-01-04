@@ -100,7 +100,14 @@
                                 }
                                 else
                                 {
-                                    <input type="hidden" asp-for="TenantId" />
+                                    <input type="hidden" asp-for="TenantId" value="@Model.TenantId" />
+                                    @if (Model.TenantId == Guid.Empty)
+                                    {
+                                        <div class="alert alert-warning">
+                                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                                            No se pudo determinar el tenant. Por favor, contacte al administrador.
+                                        </div>
+                                    }
                                 }
 
                                 <div class="form-group">
