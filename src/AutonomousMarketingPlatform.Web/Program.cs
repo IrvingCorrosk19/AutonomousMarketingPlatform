@@ -214,14 +214,13 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.AccessDeniedPath = "/Account/AccessDenied";
 });
 
-// Configurar DataProtection para persistir keys en la base de datos
-// Esto evita errores de Antiforgery cuando los contenedores se reinician
+// Configurar DataProtection - NO usar PersistKeysToDbContext todavía
+// Primero debemos ejecutar las migraciones para crear la tabla
 var dataProtectionBuilder = builder.Services.AddDataProtection()
     .SetApplicationName("AutonomousMarketingPlatform")
     .SetDefaultKeyLifetime(TimeSpan.FromDays(90));
     
-// Persistir keys en la base de datos usando el método de extensión
-dataProtectionBuilder.PersistKeysToDbContext<ApplicationDbContext>();
+// NO configurar PersistKeysToDbContext aquí - se hará después de las migraciones
 
 // Registrar TenantResolverService
 builder.Services.AddScoped<ITenantResolverService, TenantResolverService>();
@@ -294,6 +293,34 @@ builder.Services.AddCors(options =>
     }
 });
 
+// EJECUTAR MIGRACIONES ANTES de construir la app para que DataProtection funcione
+Console.WriteLine("[INFO] Aplicando migraciones de base de datos ANTES de construir la app...");
+try
+{
+    // Crear un DbContext temporal solo para migraciones
+    var tempOptions = new DbContextOptionsBuilder<ApplicationDbContext>()
+        .UseNpgsql(connectionString)
+        .Options;
+    
+    using (var tempDbContext = new ApplicationDbContext(tempOptions))
+    {
+        Console.WriteLine("[INFO] Ejecutando migraciones pendientes...");
+        await tempDbContext.Database.MigrateAsync();
+        Console.WriteLine("[INFO] Migraciones aplicadas exitosamente");
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[ERROR] Error al aplicar migraciones: {ex.GetType().Name}");
+    Console.WriteLine($"[ERROR] Mensaje: {ex.Message}");
+    Console.WriteLine($"[ERROR] StackTrace: {ex.StackTrace}");
+    // Continuar - puede que las migraciones ya estén aplicadas
+}
+
+// AHORA configurar DataProtection para usar la base de datos
+// La tabla ya debería existir después de las migraciones
+dataProtectionBuilder.PersistKeysToDbContext<ApplicationDbContext>();
+
 Console.WriteLine("[INFO] Construyendo aplicación...");
 WebApplication app;
 try
@@ -324,28 +351,8 @@ catch (Exception ex)
     throw;
 }
 
-// Aplicar migraciones automáticamente (siempre, en desarrollo y producción)
-Console.WriteLine("[INFO] Aplicando migraciones de base de datos...");
-using (var scope = app.Services.CreateScope())
-{
-    try
-    {
-        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        Console.WriteLine("[INFO] Ejecutando migraciones pendientes...");
-        await dbContext.Database.MigrateAsync();
-        Console.WriteLine("[INFO] Migraciones aplicadas exitosamente");
-    }
-    catch (Exception ex)
-    {
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Error al aplicar migraciones");
-        Console.WriteLine($"[ERROR] Error al aplicar migraciones: {ex.GetType().Name}");
-        Console.WriteLine($"[ERROR] Mensaje: {ex.Message}");
-        Console.WriteLine($"[ERROR] StackTrace: {ex.StackTrace}");
-        // NO lanzar excepción aquí, permitir que la app inicie aunque falle la migración
-        // (puede que las migraciones ya estén aplicadas)
-    }
-}
+// Las migraciones ya se ejecutaron antes de construir la app
+// No es necesario ejecutarlas de nuevo aquí
 
 // Seed roles (siempre, en desarrollo y producción)
 Console.WriteLine("[INFO] Iniciando seeding de datos del sistema...");
