@@ -3,6 +3,7 @@ using AutonomousMarketingPlatform.Application.Services;
 using AutonomousMarketingPlatform.Application.UseCases.AI;
 using AutonomousMarketingPlatform.Domain.Entities;
 using AutonomousMarketingPlatform.Domain.Interfaces;
+using AutonomousMarketingPlatform.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
