@@ -6,6 +6,7 @@ using AutonomousMarketingPlatform.Web.Attributes;
 using AutonomousMarketingPlatform.Web.Helpers;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 
@@ -21,15 +22,18 @@ public class UsersController : Controller
     private readonly IMediator _mediator;
     private readonly ILogger<UsersController> _logger;
     private readonly ILoggingService _loggingService;
+    private readonly UserManager<Domain.Entities.ApplicationUser> _userManager;
 
     public UsersController(
         IMediator mediator, 
         ILogger<UsersController> logger,
-        ILoggingService loggingService)
+        ILoggingService loggingService,
+        UserManager<Domain.Entities.ApplicationUser> userManager)
     {
         _mediator = mediator;
         _logger = logger;
         _loggingService = loggingService;
+        _userManager = userManager;
     }
 
     /// <summary>
@@ -130,10 +134,30 @@ public class UsersController : Controller
         if (!isSuperAdmin)
         {
             var tenantId = UserHelper.GetTenantId(User);
-            if (tenantId.HasValue)
+            var currentUserId = UserHelper.GetUserId(User);
+            
+            // Si no está en claims, obtenerlo directamente del usuario en la base de datos
+            if (!tenantId.HasValue || tenantId.Value == Guid.Empty)
+            {
+                if (currentUserId.HasValue)
+                {
+                    var currentUser = await _userManager.FindByIdAsync(currentUserId.Value.ToString());
+                    if (currentUser != null && currentUser.TenantId != Guid.Empty)
+                    {
+                        tenantId = currentUser.TenantId;
+                        _logger.LogInformation("[UsersController.Create] TenantId obtenido desde DB del usuario actual: {TenantId}", tenantId.Value);
+                    }
+                }
+            }
+            
+            if (tenantId.HasValue && tenantId.Value != Guid.Empty)
             {
                 model.TenantId = tenantId.Value;
                 _logger.LogInformation("[UsersController.Create] TenantId asignado desde usuario actual: {TenantId}", tenantId.Value);
+            }
+            else
+            {
+                _logger.LogError("[UsersController.Create] No se pudo obtener TenantId del usuario actual. UserId: {UserId}", currentUserId?.ToString() ?? "NULL");
             }
         }
 
