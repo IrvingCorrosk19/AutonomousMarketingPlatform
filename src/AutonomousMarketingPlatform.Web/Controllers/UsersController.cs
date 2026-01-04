@@ -131,12 +131,13 @@ public class UsersController : Controller
         }
 
         // Si no es SuperAdmin, obtener TenantId del usuario actual
+        // ESTO DEBE HACERSE ANTES DE CUALQUIER VALIDACIÓN
         if (!isSuperAdmin)
         {
             var tenantId = UserHelper.GetTenantId(User);
             var currentUserId = UserHelper.GetUserId(User);
             
-            // Si no está en claims, obtenerlo directamente del usuario en la base de datos
+            // Si no está en claims o es Guid.Empty, obtenerlo directamente del usuario en la base de datos
             if (!tenantId.HasValue || tenantId.Value == Guid.Empty)
             {
                 if (currentUserId.HasValue)
@@ -150,6 +151,7 @@ public class UsersController : Controller
                 }
             }
             
+            // FORZAR la asignación del TenantId ANTES de validar
             if (tenantId.HasValue && tenantId.Value != Guid.Empty)
             {
                 model.TenantId = tenantId.Value;
@@ -158,8 +160,17 @@ public class UsersController : Controller
             else
             {
                 _logger.LogError("[UsersController.Create] No se pudo obtener TenantId del usuario actual. UserId: {UserId}", currentUserId?.ToString() ?? "NULL");
+                // Agregar error de ModelState para que se muestre en la vista
+                ModelState.AddModelError(nameof(model.TenantId), "No se pudo determinar el tenant. Por favor, contacte al administrador.");
             }
         }
+        
+        // Loggear el estado del modelo DESPUÉS de asignar TenantId pero ANTES de validar
+        _logger.LogInformation("[UsersController.Create] Model después de asignar TenantId - Email: {Email}, TenantId: {TenantId}, Role: {Role}, IsActive: {IsActive}",
+            model.Email ?? "NULL",
+            model.TenantId,
+            model.Role ?? "NULL",
+            model.IsActive);
 
         // Validar que el email no esté vacío
         if (string.IsNullOrWhiteSpace(model.Email))
