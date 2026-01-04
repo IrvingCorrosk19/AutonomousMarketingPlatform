@@ -1,6 +1,7 @@
 @model AutonomousMarketingPlatform.Application.DTOs.CampaignMetricsSummaryDto
 @{
     ViewData["Title"] = $"Métricas - {Model.CampaignName}";
+    Layout = "~/Views/Shared/_Layout.cshtml";
     var fromDate = ViewBag.FromDate as DateTime?;
     var toDate = ViewBag.ToDate as DateTime?;
 }

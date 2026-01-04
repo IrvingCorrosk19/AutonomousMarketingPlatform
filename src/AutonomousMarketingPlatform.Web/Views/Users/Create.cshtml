@@ -2,6 +2,7 @@
 @using AutonomousMarketingPlatform.Application.DTOs
 @{
     ViewData["Title"] = "Crear Usuario";
+    Layout = "~/Views/Shared/_Layout.cshtml";
     var isSuperAdmin = User.HasClaim("IsSuperAdmin", "true");
     var tenants = ViewBag.Tenants as List<TenantDto> ?? new List<TenantDto>();
 }

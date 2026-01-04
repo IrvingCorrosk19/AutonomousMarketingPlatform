@@ -1,6 +1,7 @@
 @model AutonomousMarketingPlatform.Application.DTOs.UpdateUserDto
 @{
     ViewData["Title"] = "Editar Usuario";
+    Layout = "~/Views/Shared/_Layout.cshtml";
     var userId = ViewBag.UserId as Guid? ?? Guid.Empty;
     var email = ViewBag.Email as string ?? "";
     var tenantName = ViewBag.TenantName as string ?? "";

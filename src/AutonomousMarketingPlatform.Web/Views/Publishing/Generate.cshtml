@@ -1,6 +1,7 @@
 @model AutonomousMarketingPlatform.Application.DTOs.GeneratePublishingJobDto
 @{
     ViewData["Title"] = "Generar Publicación";
+    Layout = "~/Views/Shared/_Layout.cshtml";
     var campaignId = ViewBag.CampaignId as Guid?;
     var marketingPackId = ViewBag.MarketingPackId as Guid?;
 }
