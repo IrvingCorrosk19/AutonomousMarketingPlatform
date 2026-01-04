@@ -105,6 +105,9 @@ public class UsersController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(CreateUserDto model)
     {
+        _logger.LogInformation("[UsersController.Create] Iniciando creación de usuario. Email: {Email}, TenantId: {TenantId}", 
+            model.Email ?? "NULL", model.TenantId);
+        
         // Verificar permisos: Admin, Owner o SuperAdmin
         var isSuperAdmin = User.HasClaim("IsSuperAdmin", "true");
         var isAdmin = User.IsInRole("Admin");
@@ -112,11 +115,15 @@ public class UsersController : Controller
         
         if (!isSuperAdmin && !isAdmin && !isOwner)
         {
+            _logger.LogWarning("[UsersController.Create] Acceso denegado. Usuario no tiene permisos");
             return RedirectToAction("AccessDenied", "Account");
         }
 
         if (!ModelState.IsValid)
         {
+            _logger.LogWarning("[UsersController.Create] ModelState inválido. Errores: {Errors}", 
+                string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
+            
             // Recargar tenants si es SuperAdmin
             if (isSuperAdmin)
             {
@@ -132,35 +139,49 @@ public class UsersController : Controller
             // Validar que el email no esté vacío
             if (string.IsNullOrWhiteSpace(model.Email))
             {
+                _logger.LogWarning("[UsersController.Create] Email vacío");
                 ModelState.AddModelError(nameof(model.Email), "El email es requerido");
             }
 
             // Validar que la contraseña no esté vacía
             if (string.IsNullOrWhiteSpace(model.Password))
             {
+                _logger.LogWarning("[UsersController.Create] Contraseña vacía");
                 ModelState.AddModelError(nameof(model.Password), "La contraseña es requerida");
             }
             else
             {
+                // Validar que las contraseñas coincidan
+                if (model.Password != model.ConfirmPassword)
+                {
+                    _logger.LogWarning("[UsersController.Create] Las contraseñas no coinciden");
+                    ModelState.AddModelError(nameof(model.ConfirmPassword), "Las contraseñas no coinciden");
+                }
+                
                 // Validar requisitos de contraseña
                 if (model.Password.Length < 8)
                 {
+                    _logger.LogWarning("[UsersController.Create] Contraseña muy corta: {Length} caracteres", model.Password.Length);
                     ModelState.AddModelError(nameof(model.Password), "La contraseña debe tener al menos 8 caracteres");
                 }
                 if (!model.Password.Any(char.IsUpper))
                 {
+                    _logger.LogWarning("[UsersController.Create] Contraseña sin mayúsculas");
                     ModelState.AddModelError(nameof(model.Password), "La contraseña debe contener al menos una letra mayúscula");
                 }
                 if (!model.Password.Any(char.IsLower))
                 {
+                    _logger.LogWarning("[UsersController.Create] Contraseña sin minúsculas");
                     ModelState.AddModelError(nameof(model.Password), "La contraseña debe contener al menos una letra minúscula");
                 }
                 if (!model.Password.Any(char.IsDigit))
                 {
+                    _logger.LogWarning("[UsersController.Create] Contraseña sin números");
                     ModelState.AddModelError(nameof(model.Password), "La contraseña debe contener al menos un número");
                 }
                 if (!model.Password.Any(ch => !char.IsLetterOrDigit(ch)))
                 {
+                    _logger.LogWarning("[UsersController.Create] Contraseña sin caracteres especiales");
                     ModelState.AddModelError(nameof(model.Password), "La contraseña debe contener al menos un carácter especial");
                 }
             }
@@ -168,12 +189,16 @@ public class UsersController : Controller
             // Validar que el tenant no sea Guid.Empty
             if (model.TenantId == Guid.Empty)
             {
+                _logger.LogWarning("[UsersController.Create] TenantId vacío");
                 ModelState.AddModelError(nameof(model.TenantId), "Debe seleccionar un tenant");
             }
 
             // Si hay errores de validación, retornar la vista
             if (!ModelState.IsValid)
             {
+                _logger.LogWarning("[UsersController.Create] Validación fallida. Errores: {Errors}", 
+                    string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage)));
+                
                 // Recargar tenants si es SuperAdmin
                 if (isSuperAdmin)
                 {
@@ -183,6 +208,8 @@ public class UsersController : Controller
                 }
                 return View(model);
             }
+            
+            _logger.LogInformation("[UsersController.Create] Validación exitosa, creando usuario...");
 
             var command = new CreateUserCommand
             {
@@ -195,12 +222,13 @@ public class UsersController : Controller
             };
 
             await _mediator.Send(command);
+            _logger.LogInformation("[UsersController.Create] Usuario creado exitosamente. Email: {Email}", model.Email);
             TempData["SuccessMessage"] = "Usuario creado exitosamente.";
             return RedirectToAction(nameof(Index));
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogError(ex, "Error al crear usuario: {Message}", ex.Message);
+            _logger.LogError(ex, "[UsersController.Create] Error al crear usuario: {Message}", ex.Message);
             
             // Detectar si es error de usuario existente
             if (ex.Message.Contains("ya existe") || ex.Message.Contains("already exists"))
@@ -245,7 +273,7 @@ public class UsersController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error inesperado al crear usuario");
+            _logger.LogError(ex, "[UsersController.Create] Error inesperado al crear usuario. StackTrace: {StackTrace}", ex.StackTrace);
             ModelState.AddModelError("", "Ocurrió un error inesperado al crear el usuario. Por favor, intente nuevamente.");
             
             // Recargar tenants si es SuperAdmin

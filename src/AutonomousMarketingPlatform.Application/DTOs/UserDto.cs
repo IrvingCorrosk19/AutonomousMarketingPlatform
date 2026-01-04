@@ -39,6 +39,12 @@ public class CreateUserDto
     [Display(Name = "Contraseña")]
     public string Password { get; set; } = string.Empty;
 
+    [Required(ErrorMessage = "La confirmación de contraseña es requerida")]
+    [DataType(DataType.Password)]
+    [Display(Name = "Confirmar Contraseña")]
+    [Compare("Password", ErrorMessage = "Las contraseñas no coinciden")]
+    public string ConfirmPassword { get; set; } = string.Empty;
+
     [Required(ErrorMessage = "El nombre completo es requerido")]
     [StringLength(200, ErrorMessage = "El nombre completo no puede exceder 200 caracteres")]
     [Display(Name = "Nombre Completo")]
