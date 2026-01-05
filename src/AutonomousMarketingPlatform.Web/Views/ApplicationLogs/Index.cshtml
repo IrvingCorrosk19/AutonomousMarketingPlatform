@@ -62,7 +62,7 @@
                                                     <option value="">Todos</option>
                                                     @foreach (var tenant in tenants)
                                                     {
-                                                        <option value="@tenant.Id" @(tenantId == tenant.Id ? "selected" : "")>@tenant.Name</option>
+                                                        <option value="@tenant.Id" selected="@(tenantId == tenant.Id)">@tenant.Name</option>
                                                     }
                                                 </select>
                                             </div>
@@ -73,11 +73,11 @@
                                             <label>Nivel</label>
                                             <select name="level" class="form-control">
                                                 <option value="">Todos</option>
-                                                <option value="Error" @(level == "Error" ? "selected" : "")>Error</option>
-                                                <option value="Warning" @(level == "Warning" ? "selected" : "")>Warning</option>
-                                                <option value="Information" @(level == "Information" ? "selected" : "")>Information</option>
-                                                <option value="Critical" @(level == "Critical" ? "selected" : "")>Critical</option>
-                                                <option value="Debug" @(level == "Debug" ? "selected" : "")>Debug</option>
+                                                <option value="Error" selected="@(level == "Error")">Error</option>
+                                                <option value="Warning" selected="@(level == "Warning")">Warning</option>
+                                                <option value="Information" selected="@(level == "Information")">Information</option>
+                                                <option value="Critical" selected="@(level == "Critical")">Critical</option>
+                                                <option value="Debug" selected="@(level == "Debug")">Debug</option>
                                             </select>
                                         </div>
                                     </div>

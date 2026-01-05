@@ -106,8 +106,19 @@ public class TenantDto
 /// </summary>
 public class CreateTenantDto
 {
+    [Required(ErrorMessage = "El nombre es requerido")]
+    [StringLength(200, ErrorMessage = "El nombre no puede exceder 200 caracteres")]
+    [Display(Name = "Nombre")]
     public string Name { get; set; } = string.Empty;
+
+    [StringLength(100, ErrorMessage = "El subdomain no puede exceder 100 caracteres")]
+    [RegularExpression(@"^[a-z0-9-]+$", ErrorMessage = "El subdomain solo puede contener letras minúsculas, números y guiones")]
+    [Display(Name = "Subdomain")]
     public string? Subdomain { get; set; }
+
+    [EmailAddress(ErrorMessage = "El email no tiene un formato válido")]
+    [StringLength(255, ErrorMessage = "El email no puede exceder 255 caracteres")]
+    [Display(Name = "Email de Contacto")]
     public string? ContactEmail { get; set; }
 }
 
@@ -116,9 +127,24 @@ public class CreateTenantDto
 /// </summary>
 public class UpdateTenantDto
 {
+    public Guid Id { get; set; }
+
+    [Required(ErrorMessage = "El nombre es requerido")]
+    [StringLength(200, ErrorMessage = "El nombre no puede exceder 200 caracteres")]
+    [Display(Name = "Nombre")]
     public string Name { get; set; } = string.Empty;
+
+    [StringLength(100, ErrorMessage = "El subdomain no puede exceder 100 caracteres")]
+    [RegularExpression(@"^[a-z0-9-]+$", ErrorMessage = "El subdomain solo puede contener letras minúsculas, números y guiones")]
+    [Display(Name = "Subdomain")]
     public string? Subdomain { get; set; }
+
+    [EmailAddress(ErrorMessage = "El email no tiene un formato válido")]
+    [StringLength(255, ErrorMessage = "El email no puede exceder 255 caracteres")]
+    [Display(Name = "Email de Contacto")]
     public string? ContactEmail { get; set; }
+
+    [Display(Name = "Activo")]
     public bool IsActive { get; set; } = true;
 }
 

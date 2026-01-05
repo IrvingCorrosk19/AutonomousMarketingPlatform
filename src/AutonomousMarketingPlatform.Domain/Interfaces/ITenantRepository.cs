@@ -19,9 +19,14 @@ public interface ITenantRepository
     Task<IEnumerable<Tenant>> GetAllAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Busca un tenant por subdomain.
+    /// Busca un tenant por subdomain (solo activos, usado para autenticación).
     /// </summary>
     Task<Tenant?> GetBySubdomainAsync(string subdomain, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Verifica si existe un tenant con el subdomain especificado (activo o inactivo, usado para validación de unicidad).
+    /// </summary>
+    Task<Tenant?> GetBySubdomainAnyAsync(string subdomain, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Agrega un nuevo tenant.

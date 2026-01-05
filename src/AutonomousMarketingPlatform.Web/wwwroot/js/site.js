@@ -85,8 +85,9 @@ function showFormLoading($form, message) {
         showButtonLoading($submitBtn, '<i class="fas fa-spinner fa-spin mr-1"></i>' + message);
     }
     
-    // Deshabilitar todos los campos del formulario
-    $form.find('input, select, textarea, button').prop('disabled', true);
+    // NO deshabilitar los campos del formulario porque no se enviarían
+    // Solo deshabilitar el botón de submit para evitar doble envío
+    // Los campos se mantienen habilitados para que se envíen correctamente
     
     // Agregar overlay al formulario
     if ($form.find('.form-loading-overlay').length === 0) {
@@ -114,9 +115,7 @@ function hideFormLoading($form) {
         hideButtonLoading($submitBtn);
     }
     
-    // Habilitar todos los campos del formulario
-    $form.find('input, select, textarea, button').prop('disabled', false);
-    
+    // Los campos ya estaban habilitados, solo habilitar el botón si estaba deshabilitado
     // Remover overlay del formulario
     $form.find('.form-loading-overlay').remove();
 }
@@ -134,12 +133,16 @@ $(document).ready(function() {
     // ============================================
     
     // Aplicar loading a todos los formularios al enviar
+    // IMPORTANTE: No usar preventDefault() para permitir que el formulario se envíe normalmente
     $('form').on('submit', function(e) {
         var $form = $(this);
         
         // Solo aplicar loading si el formulario es válido
+        // NO usar preventDefault() - dejar que el formulario se envíe normalmente
         if ($form[0].checkValidity()) {
+            // Aplicar loading visual pero NO bloquear el envío
             showFormLoading($form, 'Guardando...');
+            // El formulario se enviará normalmente con todos los datos
         }
     });
     

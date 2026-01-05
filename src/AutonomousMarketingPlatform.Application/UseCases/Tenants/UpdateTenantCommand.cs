@@ -39,11 +39,11 @@ public class UpdateTenantCommandHandler : IRequestHandler<UpdateTenantCommand, T
             throw new InvalidOperationException($"Tenant {request.TenantId} no encontrado");
         }
 
-        // Verificar si el subdomain ya está en uso por otro tenant
+        // Verificar si el subdomain ya está en uso por otro tenant (activo o inactivo)
         if (!string.IsNullOrEmpty(request.Tenant.Subdomain) && 
             request.Tenant.Subdomain != tenant.Subdomain)
         {
-            var existingBySubdomain = await _tenantRepository.GetBySubdomainAsync(
+            var existingBySubdomain = await _tenantRepository.GetBySubdomainAnyAsync(
                 request.Tenant.Subdomain, 
                 cancellationToken);
             if (existingBySubdomain != null && existingBySubdomain.Id != request.TenantId)

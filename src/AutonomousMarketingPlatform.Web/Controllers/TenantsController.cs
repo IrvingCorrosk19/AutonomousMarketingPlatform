@@ -56,12 +56,66 @@ public class TenantsController : Controller
     /// Crear tenant.
     /// </summary>
     [HttpPost]
-    public async Task<IActionResult> Create(CreateTenantDto model)
+    public async Task<IActionResult> Create([FromForm] CreateTenantDto model)
     {
+
+       
+        _logger.LogInformation("=== [TenantsController.Create] POST INICIADO ===");
+        _logger.LogInformation("[TenantsController.Create] Request Path: {Path}", HttpContext.Request.Path);
+        _logger.LogInformation("[TenantsController.Create] Request Method: {Method}", HttpContext.Request.Method);
+        _logger.LogInformation("[TenantsController.Create] ContentType: {ContentType}", Request.ContentType);
+        _logger.LogInformation("[TenantsController.Create] HasFormContentType: {HasFormContentType}", Request.HasFormContentType);
+        _logger.LogInformation("[TenantsController.Create] Form.Count: {Count}", Request.Form?.Count ?? 0);
+        _logger.LogInformation("[TenantsController.Create] Model recibido (antes de binding): {Model}", model != null ? "NOT NULL" : "NULL");
+
+        // Loggear todos los valores del formulario
+        if (Request.Form != null && Request.Form.Count > 0)
+        {
+            _logger.LogInformation("[TenantsController.Create] === VALORES DEL FORMULARIO ===");
+            foreach (var key in Request.Form.Keys)
+            {
+                var value = Request.Form[key].ToString();
+                _logger.LogInformation("[TenantsController.Create] Form[{Key}] = {Value}", key, value);
+            }
+        }
+
+        // Si el modelo es null, crear uno nuevo
+        if (model == null)
+        {
+            _logger.LogWarning("[TenantsController.Create] Model es NULL, creando nuevo modelo");
+            model = new CreateTenantDto();
+        }
+
+        // Loggear el modelo recibido
+        _logger.LogInformation("[TenantsController.Create] === MODELO RECIBIDO ===");
+        _logger.LogInformation("[TenantsController.Create] Model.Name: {Name}", model.Name ?? "NULL");
+        _logger.LogInformation("[TenantsController.Create] Model.Subdomain: {Subdomain}", model.Subdomain ?? "NULL");
+        _logger.LogInformation("[TenantsController.Create] Model.ContactEmail: {ContactEmail}", model.ContactEmail ?? "NULL");
+
+        // Loggear ModelState
+        _logger.LogInformation("[TenantsController.Create] === MODELSTATE ===");
+        _logger.LogInformation("[TenantsController.Create] ModelState.IsValid: {IsValid}", ModelState.IsValid);
+        _logger.LogInformation("[TenantsController.Create] ModelState.ErrorCount: {ErrorCount}", ModelState.ErrorCount);
+        
         if (!ModelState.IsValid)
         {
+            _logger.LogWarning("[TenantsController.Create] ModelState NO ES VÁLIDO");
+            foreach (var key in ModelState.Keys)
+            {
+                var state = ModelState[key];
+                if (state?.Errors != null && state.Errors.Count > 0)
+                {
+                    foreach (var error in state.Errors)
+                    {
+                        _logger.LogWarning("[TenantsController.Create] ModelState Error - Key: {Key}, Error: {Error}", 
+                            key, error.ErrorMessage);
+                    }
+                }
+            }
             return View(model);
         }
+
+        _logger.LogInformation("[TenantsController.Create] ModelState ES VÁLIDO, procediendo a crear tenant");
 
         try
         {
@@ -72,13 +126,24 @@ public class TenantsController : Controller
                 ContactEmail = model.ContactEmail
             };
 
-            await _mediator.Send(command);
+            _logger.LogInformation("[TenantsController.Create] Comando creado - Name: {Name}, Subdomain: {Subdomain}, ContactEmail: {ContactEmail}",
+                command.Name, command.Subdomain, command.ContactEmail);
+
+            _logger.LogInformation("[TenantsController.Create] Enviando comando a Mediator...");
+            var result = await _mediator.Send(command);
+            _logger.LogInformation("[TenantsController.Create] Tenant creado exitosamente - Id: {Id}, Name: {Name}", 
+                result.Id, result.Name);
+
             TempData["SuccessMessage"] = "Tenant creado exitosamente.";
+            _logger.LogInformation("[TenantsController.Create] Redirigiendo a Index");
             return RedirectToAction(nameof(Index));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error al crear tenant");
+            _logger.LogError(ex, "[TenantsController.Create] ERROR al crear tenant");
+            _logger.LogError("[TenantsController.Create] Exception Type: {Type}", ex.GetType().Name);
+            _logger.LogError("[TenantsController.Create] Exception Message: {Message}", ex.Message);
+            _logger.LogError("[TenantsController.Create] Exception StackTrace: {StackTrace}", ex.StackTrace);
             ModelState.AddModelError("", ex.Message);
             return View(model);
         }
@@ -107,6 +172,7 @@ public class TenantsController : Controller
 
             var updateDto = new UpdateTenantDto
             {
+                Id = tenant.Id,
                 Name = tenant.Name,
                 Subdomain = tenant.Subdomain,
                 ContactEmail = tenant.ContactEmail,
@@ -129,6 +195,9 @@ public class TenantsController : Controller
     [HttpPost]
     public async Task<IActionResult> Edit(Guid id, UpdateTenantDto model)
     {
+        // Asegurar que el Id del modelo coincida con el parámetro de ruta
+        model.Id = id;
+
         if (!ModelState.IsValid)
         {
             return View(model);

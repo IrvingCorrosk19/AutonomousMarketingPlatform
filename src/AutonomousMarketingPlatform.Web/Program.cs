@@ -43,6 +43,18 @@ else
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 
+// Configurar AntiForgery explícitamente con cookies compatibles
+builder.Services.AddAntiforgery(options =>
+{
+    options.Cookie.Name = "AMP.AntiForgery";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Always para evitar mismatch con ForwardedHeaders
+    options.Cookie.Path = "/"; // Asegurar path consistente
+    options.HeaderName = "X-CSRF-TOKEN";
+    options.FormFieldName = "__RequestVerificationToken";
+});
+
 // Registrar filtro de logging para debugging
 builder.Services.AddScoped<AutonomousMarketingPlatform.Web.Filters.LoggingActionFilter>();
 
@@ -206,10 +218,9 @@ builder.Services.ConfigureApplicationCookie(options =>
 {
     options.Cookie.Name = "AutonomousMarketingPlatform.Auth";
     options.Cookie.HttpOnly = true;
-    options.Cookie.SecurePolicy = builder.Environment.IsProduction() 
-        ? CookieSecurePolicy.Always 
-        : CookieSecurePolicy.SameAsRequest;
-    options.Cookie.SameSite = SameSiteMode.Strict;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Always para consistencia con Antiforgery y Render
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.Path = "/"; // Asegurar path consistente
     options.ExpireTimeSpan = TimeSpan.FromHours(24);
     options.SlidingExpiration = true;
     options.LoginPath = "/Account/Login";
@@ -223,7 +234,9 @@ var dataProtectionBuilder = builder.Services.AddDataProtection()
     .SetApplicationName("AutonomousMarketingPlatform")
     .SetDefaultKeyLifetime(TimeSpan.FromDays(90));
     
-// NO configurar PersistKeysToDbContext aquí - se hará después de las migraciones
+// Proteger contra regeneración de claves por cambios de scheme/host
+// Esto asegura que las claves sean consistentes entre localhost y producción
+dataProtectionBuilder.PersistKeysToDbContext<ApplicationDbContext>();
 
 // Registrar TenantResolverService
 builder.Services.AddScoped<ITenantResolverService, TenantResolverService>();
@@ -258,6 +271,10 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | 
                                 ForwardedHeaders.XForwardedProto | 
                                 ForwardedHeaders.XForwardedHost;
+    
+    // RequireHeaderSymmetry = false es crítico para Render
+    // Permite que funcione incluso si algunos headers no están presentes
+    options.RequireHeaderSymmetry = false;
     
     // En Render, confiar en todos los proxies (Render maneja la seguridad)
     options.KnownNetworks.Clear();
@@ -319,10 +336,6 @@ catch (Exception ex)
     Console.WriteLine($"[ERROR] StackTrace: {ex.StackTrace}");
     // Continuar - puede que las migraciones ya estén aplicadas
 }
-
-// AHORA configurar DataProtection para usar la base de datos
-// La tabla ya debería existir después de las migraciones
-dataProtectionBuilder.PersistKeysToDbContext<ApplicationDbContext>();
 
 Console.WriteLine("[INFO] Construyendo aplicación...");
 WebApplication app;
