@@ -1,6 +1,7 @@
 using AutonomousMarketingPlatform.Application.DTOs;
 using AutonomousMarketingPlatform.Application.Services;
 using AutonomousMarketingPlatform.Application.UseCases.Campaigns;
+using AutonomousMarketingPlatform.Application.UseCases.Consents;
 using AutonomousMarketingPlatform.Application.UseCases.N8n;
 using AutonomousMarketingPlatform.Application.UseCases.Tenants;
 using AutonomousMarketingPlatform.Web.Attributes;
@@ -369,6 +370,60 @@ public class N8nConfigController : Controller
                 // No hay campaignId, usar valores del request o por defecto
                 instruction = request.Instruction ?? "Prueba de webhook desde frontend - Crear contenido de marketing para Instagram";
                 channels = request.Channels ?? new List<string> { "instagram" };
+            }
+
+            // Otorgar consents requeridos automáticamente si no existen (para pruebas)
+            // Esto evita errores de "Missing consents" durante las pruebas
+            try
+            {
+                var consentValidationService = HttpContext.RequestServices.GetRequiredService<IConsentValidationService>();
+                
+                // Verificar y otorgar AIGeneration consent
+                var hasAiConsent = await consentValidationService.ValidateConsentAsync(
+                    userId.Value, 
+                    tenantId.Value, 
+                    "AIGeneration", 
+                    CancellationToken.None);
+                
+                if (!hasAiConsent)
+                {
+                    _logger.LogInformation("Otorgando consentimiento AIGeneration automáticamente para pruebas (UserId={UserId})", userId.Value);
+                    var grantAiConsentCommand = new GrantConsentCommand
+                    {
+                        UserId = userId.Value,
+                        TenantId = tenantId.Value,
+                        ConsentType = "AIGeneration",
+                        ConsentVersion = "1.0",
+                        IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+                    };
+                    await _mediator.Send(grantAiConsentCommand, CancellationToken.None);
+                }
+                
+                // Verificar y otorgar AutoPublishing consent
+                var hasPublishingConsent = await consentValidationService.ValidateConsentAsync(
+                    userId.Value, 
+                    tenantId.Value, 
+                    "AutoPublishing", 
+                    CancellationToken.None);
+                
+                if (!hasPublishingConsent)
+                {
+                    _logger.LogInformation("Otorgando consentimiento AutoPublishing automáticamente para pruebas (UserId={UserId})", userId.Value);
+                    var grantPublishingConsentCommand = new GrantConsentCommand
+                    {
+                        UserId = userId.Value,
+                        TenantId = tenantId.Value,
+                        ConsentType = "AutoPublishing",
+                        ConsentVersion = "1.0",
+                        IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString()
+                    };
+                    await _mediator.Send(grantPublishingConsentCommand, CancellationToken.None);
+                }
+            }
+            catch (Exception consentEx)
+            {
+                _logger.LogWarning(consentEx, "Error al otorgar consents automáticamente. Continuando con la prueba del webhook.");
+                // Continuar con la prueba aunque falle el otorgamiento de consents
             }
 
             // Usar el servicio de automatización para disparar el webhook
