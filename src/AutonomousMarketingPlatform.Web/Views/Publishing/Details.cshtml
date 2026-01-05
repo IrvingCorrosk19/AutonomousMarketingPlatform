@@ -223,7 +223,6 @@
                 </div>
                 <form asp-action="Approve" method="post">
                     <input type="hidden" name="id" value="@Model.Id" />
-                    @Html.AntiForgeryToken()
                     <div class="modal-body">
                         <div class="form-group">
                             <label for="publishedUrl">URL de la Publicación</label>

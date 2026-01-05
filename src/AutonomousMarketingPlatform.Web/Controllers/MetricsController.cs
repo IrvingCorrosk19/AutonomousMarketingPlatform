@@ -143,7 +143,6 @@ public class MetricsController : Controller
     /// Registra métricas de campaña.
     /// </summary>
     [HttpPost]
-    [ValidateAntiForgeryToken]
     [AuthorizeRole("Owner", "Admin", "Marketer")]
     public async Task<IActionResult> RegisterCampaign(RegisterCampaignMetricsDto model)
     {
@@ -203,7 +202,6 @@ public class MetricsController : Controller
     /// Registra métricas de publicación.
     /// </summary>
     [HttpPost]
-    [ValidateAntiForgeryToken]
     [AuthorizeRole("Owner", "Admin", "Marketer")]
     public async Task<IActionResult> RegisterPublishingJob(RegisterPublishingJobMetricsDto model)
     {

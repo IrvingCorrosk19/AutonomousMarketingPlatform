@@ -50,7 +50,6 @@
 
     <!-- Login Form -->
     <form asp-action="Login" asp-controller="Account" method="post" id="loginForm" class="auth-form">
-        @Html.AntiForgeryToken()
         
         @if (ViewData["TenantId"] != null)
         {

@@ -98,7 +98,6 @@ public class MarketingRequestController : Controller
     /// Procesa la solicitud de contenido de marketing y dispara el webhook a n8n.
     /// </summary>
     [HttpPost]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(MarketingRequestDto model)
     {
         // Procesar canales desde JSON

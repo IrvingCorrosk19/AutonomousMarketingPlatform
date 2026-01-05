@@ -82,7 +82,6 @@
                     </div>
                     <div class="card-body">
                         <form id="n8nConfigForm" method="post" asp-action="Save">
-                            @Html.AntiForgeryToken()
                             @if (ViewBag.IsSuperAdmin == true && ViewBag.SelectedTenantId != null)
                             {
                                 <input type="hidden" name="tenantId" value="@ViewBag.SelectedTenantId" />
@@ -179,7 +178,6 @@
                         </p>
 
                         <form id="webhooksForm" method="post" asp-action="Save">
-                            @Html.AntiForgeryToken()
                             @if (ViewBag.IsSuperAdmin == true && ViewBag.SelectedTenantId != null)
                             {
                                 <input type="hidden" name="tenantId" value="@ViewBag.SelectedTenantId" />

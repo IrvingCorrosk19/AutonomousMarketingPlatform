@@ -114,7 +114,6 @@ public class AccountController : Controller
     /// </summary>
     [HttpPost]
     [AllowAnonymous]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Login([FromForm] LoginDto model, [FromQuery] string? returnUrl = null)
     {
         ViewData["ReturnUrl"] = returnUrl;
@@ -344,7 +343,6 @@ public class AccountController : Controller
     /// Procesa el logout (POST con antiforgery token).
     /// </summary>
     [HttpPost]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()
     {
         return await PerformLogout();

@@ -79,7 +79,6 @@ public class PublishingController : Controller
     /// Genera un nuevo trabajo de publicación.
     /// </summary>
     [HttpPost]
-    [ValidateAntiForgeryToken]
     [AuthorizeRole("Owner", "Admin", "Marketer")]
     public async Task<IActionResult> Generate(GeneratePublishingJobDto model)
     {
@@ -212,7 +211,6 @@ public class PublishingController : Controller
     /// Aprueba una publicación (marca como publicada manualmente).
     /// </summary>
     [HttpPost]
-    [ValidateAntiForgeryToken]
     [AuthorizeRole("Owner", "Admin", "Marketer")]
     public async Task<IActionResult> Approve(Guid id, string? publishedUrl, string? externalPostId)
     {

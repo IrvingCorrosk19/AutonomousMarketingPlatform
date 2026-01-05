@@ -113,7 +113,6 @@
                                                         <form asp-action="ToggleActive" method="post" style="display: inline;" 
                                                               onsubmit="return confirm('¿Está seguro de que desea @(user.IsActive ? "desactivar" : "activar") este usuario?');">
                                                             <input type="hidden" name="id" value="@user.Id" />
-                                                            @Html.AntiForgeryToken()
                                                             <button type="submit" class="btn btn-sm @(user.IsActive ? "btn-warning" : "btn-success")" title="@(user.IsActive ? "Desactivar" : "Activar")">
                                                                 <i class="fas fa-@(user.IsActive ? "ban" : "check")"></i>
                                                             </button>

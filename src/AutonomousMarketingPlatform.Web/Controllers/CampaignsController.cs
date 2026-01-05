@@ -123,7 +123,6 @@ public class CampaignsController : Controller
     /// Crea una nueva campaña.
     /// </summary>
     [HttpPost]
-    [ValidateAntiForgeryToken]
     [AuthorizeRole("Owner", "Admin", "Marketer")]
     public async Task<IActionResult> Create([FromForm] CreateCampaignDto model, [FromForm] Guid? tenantId = null)
     {
@@ -703,7 +702,6 @@ public class CampaignsController : Controller
     /// Actualiza una campaña existente.
     /// </summary>
     [HttpPost]
-    [ValidateAntiForgeryToken]
     [AuthorizeRole("Owner", "Admin", "Marketer")]
     public async Task<IActionResult> Edit(Guid id, UpdateCampaignDto model)
     {
@@ -828,7 +826,6 @@ public class CampaignsController : Controller
     /// Elimina una campaña (soft delete).
     /// </summary>
     [HttpPost]
-    [ValidateAntiForgeryToken]
     [AuthorizeRole("Owner", "Admin")]
     public async Task<IActionResult> Delete(Guid id)
     {

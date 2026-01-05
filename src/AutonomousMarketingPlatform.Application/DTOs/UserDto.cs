@@ -50,7 +50,8 @@ public class CreateUserDto
     [Display(Name = "Nombre Completo")]
     public string FullName { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "El tenant es requerido")]
+    // NO usar [Required] aquí - el TenantId se asigna en el controlador desde el contexto del usuario
+    // Si es Guid.Empty, el controlador lo asignará antes de validar
     [Display(Name = "Tenant")]
     public Guid TenantId { get; set; }
 

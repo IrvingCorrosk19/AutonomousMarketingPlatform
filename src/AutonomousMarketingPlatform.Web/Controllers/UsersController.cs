@@ -8,6 +8,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using System.Text.Json;
 
 namespace AutonomousMarketingPlatform.Web.Controllers;
@@ -100,9 +101,33 @@ public class UsersController : Controller
         {
             // Si no es SuperAdmin, usar el tenant del usuario actual
             var tenantId = UserHelper.GetTenantId(User);
-            if (tenantId.HasValue)
+            var currentUserId = UserHelper.GetUserId(User);
+            
+            _logger.LogInformation("[UsersController.Create GET] TenantId desde claims: {TenantId}, UserId: {UserId}", 
+                tenantId?.ToString() ?? "NULL", currentUserId?.ToString() ?? "NULL");
+            
+            // Si no está en claims o es Guid.Empty, obtenerlo directamente del usuario en la base de datos
+            if (!tenantId.HasValue || tenantId.Value == Guid.Empty)
+            {
+                if (currentUserId.HasValue)
+                {
+                    var currentUser = await _userManager.FindByIdAsync(currentUserId.Value.ToString());
+                    if (currentUser != null && currentUser.TenantId != Guid.Empty)
+                    {
+                        tenantId = currentUser.TenantId;
+                        _logger.LogInformation("[UsersController.Create GET] TenantId obtenido de BD: {TenantId}", tenantId);
+                    }
+                }
+            }
+            
+            if (tenantId.HasValue && tenantId.Value != Guid.Empty)
             {
                 model.TenantId = tenantId.Value;
+                _logger.LogInformation("[UsersController.Create GET] TenantId asignado al modelo: {TenantId}", model.TenantId);
+            }
+            else
+            {
+                _logger.LogWarning("[UsersController.Create GET] No se pudo obtener TenantId para el usuario actual");
             }
         }
         
@@ -113,16 +138,92 @@ public class UsersController : Controller
     /// Crear usuario.
     /// </summary>
     [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(CreateUserDto model)
+    public async Task<IActionResult> Create([FromForm] CreateUserDto model)
     {
-        _logger.LogInformation("[UsersController.Create] Iniciando creación de usuario. Email: {Email}, TenantId: {TenantId}", 
-            model.Email ?? "NULL", model.TenantId);
+        // Loggear INMEDIATAMENTE al entrar al métodoL
+        _logger.LogInformation("=== [UsersController.Create] POST LLEGÓ AL CONTROLADOR ===");
+        _logger.LogInformation("[UsersController.Create] Request Path: {Path}", HttpContext.Request.Path);
+        _logger.LogInformation("[UsersController.Create] Request Method: {Method}", HttpContext.Request.Method);
         
-        // Verificar permisos: Admin, Owner o SuperAdmin
+        // SIEMPRE loggear los valores del formulario que llegan
+        _logger.LogInformation("[UsersController.Create] === VALORES DEL FORMULARIO ===");
+        _logger.LogInformation("[UsersController.Create] Request.ContentType: {ContentType}", Request.ContentType);
+        _logger.LogInformation("[UsersController.Create] Request.Form.Count: {Count}", Request.Form.Count);
+        
+        if (Request.Form.Count > 0)
+        {
+            foreach (var key in Request.Form.Keys)
+            {
+                var value = Request.Form[key].ToString();
+                // No loggear contraseñas completas por seguridad
+                if (key.Contains("Password", StringComparison.OrdinalIgnoreCase))
+                {
+                    value = value.Length > 0 ? "***" : "";
+                }
+                _logger.LogInformation("[UsersController.Create] Form[{Key}] = {Value}", key, value);
+            }
+        }
+        else
+        {
+            _logger.LogWarning("[UsersController.Create] Request.Form está vacío!");
+            
+            // Intentar leer el body directamente
+            Request.EnableBuffering();
+            Request.Body.Position = 0;
+            using var reader = new StreamReader(Request.Body, leaveOpen: true);
+            var body = await reader.ReadToEndAsync();
+            Request.Body.Position = 0;
+            
+            _logger.LogInformation("[UsersController.Create] Request Body Length: {Length}", body.Length);
+            _logger.LogInformation("[UsersController.Create] Request Body Content: {Body}", body);
+            
+            // Intentar parsear manualmente si es form-urlencoded
+            if (Request.ContentType?.Contains("application/x-www-form-urlencoded") == true && !string.IsNullOrEmpty(body))
+            {
+                _logger.LogInformation("[UsersController.Create] Intentando parsear body como form-urlencoded...");
+                var formData = QueryHelpers.ParseQuery(body);
+                foreach (var kvp in formData)
+                {
+                    var value = kvp.Value.ToString();
+                    if (kvp.Key.Contains("Password", StringComparison.OrdinalIgnoreCase))
+                    {
+                        value = value.Length > 0 ? "***" : "";
+                    }
+                    _logger.LogInformation("[UsersController.Create] Body[{Key}] = {Value}", kvp.Key, value);
+                }
+            }
+        }
+        
+        _logger.LogInformation("[UsersController.Create] Model recibido - Email: {Email}, TenantId: {TenantId}, FullName: {FullName}, Role: {Role}", 
+            model?.Email ?? "NULL", 
+            model?.TenantId ?? Guid.Empty, 
+            model?.FullName ?? "NULL",
+            model?.Role ?? "NULL");
+        
+        // Verificar permisos: Admin, Owner o SuperAdmin (hacerlo antes de validar el modelo)
         var isSuperAdmin = User.HasClaim("IsSuperAdmin", "true");
         var isAdmin = User.IsInRole("Admin");
         var isOwner = User.IsInRole("Owner");
+        
+        // Si el modelo es null o está vacío, loggear los valores del form
+        if (model == null || string.IsNullOrEmpty(model.Email))
+        {
+            _logger.LogError("[UsersController.Create] MODEL ES NULL O VACÍO - Revisando Request.Form");
+            ModelState.AddModelError("", "Error al procesar el formulario. Por favor, intente nuevamente.");
+            
+            // Recargar ViewBag para SuperAdmins
+            if (isSuperAdmin)
+            {
+                var tenantsQuery = new ListTenantsQuery();
+                var tenants = await _mediator.Send(tenantsQuery);
+                ViewBag.Tenants = tenants;
+            }
+            
+            return View(new CreateUserDto());
+        }
+        
+        _logger.LogInformation("[UsersController.Create] Iniciando creación de usuario. Email: {Email}, TenantId: {TenantId}", 
+            model.Email ?? "NULL", model.TenantId);
         
         if (!isSuperAdmin && !isAdmin && !isOwner)
         {
@@ -234,42 +335,6 @@ public class UsersController : Controller
             ModelState.AddModelError("", "No se pudo determinar el tenant. Por favor, contacte al administrador.");
         }
 
-        // Si hay errores de validación, retornar la vista
-        if (!ModelState.IsValid)
-        {
-            // Loggear TODOS los errores de ModelState con detalles
-            var errors = ModelState
-                .Where(x => x.Value?.Errors != null && x.Value.Errors.Any())
-                .SelectMany(x => x.Value.Errors.Select(e => new { Field = x.Key, Error = e.ErrorMessage }))
-                .ToList();
-            
-            var validationErrors = string.Join(", ", errors.Select(e => $"{e.Field}: {e.Error}"));
-            _logger.LogWarning("[UsersController.Create] Validación fallida. Errores: {Errors}", validationErrors);
-            _logger.LogWarning("[UsersController.Create] Model recibido - Email: {Email}, TenantId: {TenantId}, Role: {Role}, IsActive: {IsActive}, PasswordLength: {PasswordLength}, ConfirmPasswordLength: {ConfirmPasswordLength}, FullName: {FullName}",
-                model.Email ?? "NULL",
-                model.TenantId,
-                model.Role ?? "NULL",
-                model.IsActive,
-                model.Password?.Length ?? 0,
-                model.ConfirmPassword?.Length ?? 0,
-                model.FullName ?? "NULL");
-            
-            // Guardar error en base de datos con detalles completos
-            await SaveErrorToDatabase(
-                "HTTP 400 - Validación fallida al crear usuario",
-                validationErrors,
-                null,
-                model);
-            
-            // Recargar tenants si es SuperAdmin
-            if (isSuperAdmin)
-            {
-                var tenantsQuery = new ListTenantsQuery();
-                var tenants = await _mediator.Send(tenantsQuery);
-                ViewBag.Tenants = tenants;
-            }
-            return View(model);
-        }
 
         try
         {
@@ -447,8 +512,7 @@ public class UsersController : Controller
     /// Actualiza un usuario existente.
     /// </summary>
     [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid id, UpdateUserDto model)
+    public async Task<IActionResult> Edit(Guid id, [FromForm] UpdateUserDto model)
     {
         // Verificar permisos: Admin, Owner o SuperAdmin
         var isSuperAdmin = User.HasClaim("IsSuperAdmin", "true");
@@ -514,7 +578,6 @@ public class UsersController : Controller
     /// Activar/Desactivar usuario.
     /// </summary>
     [HttpPost]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> ToggleActive(Guid id)
     {
         try

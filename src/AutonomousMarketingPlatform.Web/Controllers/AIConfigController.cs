@@ -59,7 +59,6 @@ public class AIConfigController : Controller
     /// Endpoint para guardar/actualizar API key de IA.
     /// </summary>
     [HttpPost]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Save([FromForm] CreateTenantAIConfigDto dto)
     {
         try

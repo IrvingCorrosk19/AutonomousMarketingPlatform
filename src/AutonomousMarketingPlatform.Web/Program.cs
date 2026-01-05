@@ -43,6 +43,9 @@ else
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 
+// Registrar filtro de logging para debugging
+builder.Services.AddScoped<AutonomousMarketingPlatform.Web.Filters.LoggingActionFilter>();
+
 // Configurar Entity Framework Core con PostgreSQL
 // Prioridad: Variable de entorno > appsettings.Production.json > appsettings.json
 var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection") 
@@ -427,13 +430,13 @@ if (app.Environment.IsDevelopment())
                 
                 if (existingAdmin == null || existingAdmin.TenantId != Guid.Empty)
                 {
-                    // Crear usuario Owner solo si no existe o no es super admin
+                    // Crear usuario Admin solo si no existe o no es super admin
                     await userSeeder.CreateInitialUserAsync(
                         email: "admin@test.com",
                         password: "Admin123!",
                         fullName: "Administrador de Prueba",
                         tenantId: tenant.Id,
-                        roleName: "Owner");
+                        roleName: "Admin");
                 }
 
                 // Crear usuario Marketer

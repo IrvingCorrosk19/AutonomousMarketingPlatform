@@ -43,7 +43,6 @@
                         <h3 class="card-title">Información de la Campaña</h3>
                     </div>
                     <form asp-action="Create" method="post" id="createCampaignForm">
-                        @Html.AntiForgeryToken()
                         <div class="card-body">
                             <div asp-validation-summary="All" class="alert alert-danger" role="alert"></div>
 

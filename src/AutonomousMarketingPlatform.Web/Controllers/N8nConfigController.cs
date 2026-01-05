@@ -101,7 +101,6 @@ public class N8nConfigController : Controller
     /// Endpoint para guardar/actualizar configuración de n8n.
     /// </summary>
     [HttpPost]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Save([FromForm] UpdateN8nConfigDto dto, Guid? tenantId = null)
     {
         try

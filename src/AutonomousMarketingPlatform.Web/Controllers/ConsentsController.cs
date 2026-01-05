@@ -157,7 +157,6 @@ public class ConsentsController : Controller
     /// El usuario otorga su propio consentimiento, o un super admin otorga consentimiento a otro usuario.
     /// </summary>
     [HttpPost("Consents/Grant")]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Grant([FromForm] CreateConsentDto dto)
     {
         _logger.LogInformation("Grant consent llamado. ConsentType={ConsentType}, ConsentVersion={ConsentVersion}, TargetUserId={TargetUserId}", 
@@ -278,7 +277,6 @@ public class ConsentsController : Controller
     /// Revoca un consentimiento.
     /// </summary>
     [HttpPost]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Revoke([FromForm] string consentType)
     {
         var userId = UserHelper.GetUserId(User);

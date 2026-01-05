@@ -56,7 +56,6 @@ public class TenantsController : Controller
     /// Crear tenant.
     /// </summary>
     [HttpPost]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(CreateTenantDto model)
     {
         if (!ModelState.IsValid)
@@ -128,7 +127,6 @@ public class TenantsController : Controller
     /// Actualiza un tenant existente.
     /// </summary>
     [HttpPost]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(Guid id, UpdateTenantDto model)
     {
         if (!ModelState.IsValid)

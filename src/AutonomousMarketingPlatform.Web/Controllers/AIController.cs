@@ -29,7 +29,6 @@ public class AIController : Controller
     /// Genera un MarketingPack completo a partir de contenido cargado.
     /// </summary>
     [HttpPost]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> GenerateMarketingPack([FromBody] GenerateMarketingPackRequest request)
     {
         try
