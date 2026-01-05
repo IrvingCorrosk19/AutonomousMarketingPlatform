@@ -276,7 +276,7 @@ public class N8nConfigController : Controller
             // Si falló la conexión, guardar en ApplicationLogs
             if (!result.Success)
             {
-                var tenantId = UserHelper.GetTenantId(User);
+                tenantId = UserHelper.GetTenantId(User);
                 var userId = UserHelper.GetUserId(User);
                 var additionalData = System.Text.Json.JsonSerializer.Serialize(new
                 {
