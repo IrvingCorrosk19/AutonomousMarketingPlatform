@@ -244,12 +244,26 @@
                     url: form.attr('action'),
                     type: 'POST',
                     data: createUserDto,
-                    success: function(response) {
-                        window.location.href = '@Url.Action("Index")';
+                    success: function(response, textStatus, xhr) {
+                        // Si la respuesta es HTML (tiene errores de validación), mostrar la página
+                        var contentType = xhr.getResponseHeader('Content-Type') || '';
+                        if (typeof response === 'string' && response.trim().startsWith('<!')) {
+                            // Es HTML con errores de validación, reemplazar el contenido
+                            document.open();
+                            document.write(response);
+                            document.close();
+                        } else {
+                            // Éxito, redirigir
+                            window.location.href = '@Url.Action("Index")';
+                        }
                     },
                     error: function(xhr) {
-                        // Si hay errores, recargar la página para mostrar los errores del servidor
-                        document.body.innerHTML = xhr.responseText;
+                        // Si hay errores HTTP, mostrar la respuesta
+                        if (xhr.responseText) {
+                            document.open();
+                            document.write(xhr.responseText);
+                            document.close();
+                        }
                     }
                 });
             });
