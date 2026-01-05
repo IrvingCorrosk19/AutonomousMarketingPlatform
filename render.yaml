@@ -20,7 +20,7 @@ services:
       - key: N8n__ApiUrl
         value: https://n8n.bashpty.com/api/v1
       - key: N8n__DefaultWebhookUrl
-        value: https://n8n.bashpty.com/webhook/marketing-request
+        value: https://n8n.bashpty.com/webhook
       - key: AI__UseMock
         value: "false"
       - key: AI__OpenAI__ApiKey

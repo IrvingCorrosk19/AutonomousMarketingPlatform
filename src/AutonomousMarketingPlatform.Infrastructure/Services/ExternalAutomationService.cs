@@ -271,13 +271,51 @@ public class ExternalAutomationService : IExternalAutomationService
             }
             _logger.LogInformation("=== FIN PAYLOAD ===");
             
-            // Enviar el request
-            response = await _httpClient.PostAsync(webhookUrl, content, cancellationToken);
+            // Validar que la URL sea absoluta (necesario cuando no hay BaseAddress)
+            if (!Uri.TryCreate(webhookUrl, UriKind.Absolute, out var validatedUri))
+            {
+                _logger.LogError("URL del webhook no es válida o no es absoluta: {WebhookUrl}", webhookUrl);
+                throw new ArgumentException($"Invalid webhook URL: {webhookUrl}. URL must be absolute.");
+            }
             
             _logger.LogInformation(
-                "Respuesta de n8n: StatusCode={StatusCode}, ReasonPhrase={ReasonPhrase}",
+                "Enviando POST request a n8n: URL={WebhookUrl}, Scheme={Scheme}, Host={Host}, Port={Port}",
+                webhookUrl,
+                validatedUri.Scheme,
+                validatedUri.Host,
+                validatedUri.Port);
+            
+            // Enviar el request con timeout extendido
+            try
+            {
+                response = await _httpClient.PostAsync(webhookUrl, content, cancellationToken);
+            }
+            catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+            {
+                _logger.LogError(
+                    ex,
+                    "Timeout al llamar a n8n webhook después de {Timeout} segundos. URL: {WebhookUrl}",
+                    _httpClient.Timeout.TotalSeconds,
+                    webhookUrl);
+                throw new HttpRequestException(
+                    $"Timeout al llamar a n8n: La solicitud excedió el tiempo límite de {_httpClient.Timeout.TotalSeconds} segundos. URL: {webhookUrl}",
+                    ex);
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error de red al llamar a n8n webhook. URL: {WebhookUrl}, Error: {Error}",
+                    webhookUrl,
+                    ex.Message);
+                throw;
+            }
+            
+            _logger.LogInformation(
+                "Respuesta de n8n recibida: StatusCode={StatusCode}, ReasonPhrase={ReasonPhrase}, Headers={Headers}",
                 response.StatusCode,
-                response.ReasonPhrase);
+                response.ReasonPhrase,
+                string.Join(", ", response.Headers.Select(h => $"{h.Key}: {string.Join(", ", h.Value)}")));
 
             if (!response.IsSuccessStatusCode)
             {

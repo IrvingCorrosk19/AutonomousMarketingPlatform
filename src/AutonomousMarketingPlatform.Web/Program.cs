@@ -164,9 +164,34 @@ builder.Services.AddScoped<IEncryptionService, EncryptionService>();
 // Configurar HttpClient para ExternalAutomationService (n8n)
 builder.Services.AddHttpClient<ExternalAutomationService>(client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(30);
-    var n8nBaseUrl = builder.Configuration["N8n:BaseUrl"] ?? "http://localhost:5678";
-    client.BaseAddress = new Uri(n8nBaseUrl);
+    // Timeout aumentado para workflows largos de n8n (5 minutos)
+    client.Timeout = TimeSpan.FromMinutes(5);
+    
+    // NO configurar BaseAddress porque usamos URLs absolutas completas
+    // Esto evita problemas cuando se usa PostAsync con URLs completas
+    
+    // Configurar headers por defecto
+    client.DefaultRequestHeaders.Add("User-Agent", "AutonomousMarketingPlatform/1.0");
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+}).ConfigurePrimaryHttpMessageHandler(serviceProvider =>
+{
+    var environment = serviceProvider.GetRequiredService<IWebHostEnvironment>();
+    return new HttpClientHandler
+    {
+        // Permitir redirecciones
+        AllowAutoRedirect = true,
+        // Configurar validación de certificados SSL
+        ServerCertificateCustomValidationCallback = (message, cert, chain, errors) =>
+        {
+            // En desarrollo, permitir certificados auto-firmados
+            if (environment.IsDevelopment())
+            {
+                return true;
+            }
+            // En producción, validar normalmente (Render debe validar SSL correctamente)
+            return errors == System.Net.Security.SslPolicyErrors.None;
+        }
+    };
 });
 
 builder.Services.AddScoped<IExternalAutomationService, ExternalAutomationService>();
