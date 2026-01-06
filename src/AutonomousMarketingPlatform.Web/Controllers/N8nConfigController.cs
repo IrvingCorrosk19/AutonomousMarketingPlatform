@@ -340,12 +340,19 @@ public class N8nConfigController : Controller
     {
         try
         {
+            // Validar y normalizar CampaignId si viene como Guid.Empty o inválido
+            if (request != null && request.CampaignId.HasValue && request.CampaignId.Value == Guid.Empty)
+            {
+                request.CampaignId = null;
+                _logger.LogWarning("CampaignId recibido es Guid.Empty, se establecerá como null");
+            }
+            
             var isSuperAdmin = User.HasClaim("IsSuperAdmin", "true");
             var tenantId = UserHelper.GetTenantId(User);
             var userId = UserHelper.GetUserId(User);
             
             // Si es SuperAdmin y el request incluye un tenantId, usarlo
-            if (isSuperAdmin && request.TenantId.HasValue && request.TenantId.Value != Guid.Empty)
+            if (isSuperAdmin && request?.TenantId.HasValue == true && request.TenantId.Value != Guid.Empty)
             {
                 tenantId = request.TenantId;
                 _logger.LogInformation(
@@ -356,6 +363,12 @@ public class N8nConfigController : Controller
             if (!tenantId.HasValue || !userId.HasValue)
             {
                 return Json(new { success = false, message = "Usuario no autenticado correctamente o TenantId no especificado" });
+            }
+            
+            // Validar que request no sea null
+            if (request == null)
+            {
+                return Json(new { success = false, message = "Request no puede ser null" });
             }
 
             // Si hay campaignId, cargar los datos reales de la campaña
@@ -751,6 +764,40 @@ public class TestWebhookRequest
     public Guid? TenantId { get; set; }
     /// <summary>
     /// CampaignId opcional para asociar la solicitud a una campaña (igual que en MarketingRequestController).
+    /// Puede venir como string desde el frontend, se parsea en el método.
     /// </summary>
+    [System.Text.Json.Serialization.JsonConverter(typeof(FlexibleGuidConverter))]
     public Guid? CampaignId { get; set; }
+}
+
+/// <summary>
+/// Converter flexible que acepta CampaignId como string o Guid desde el frontend.
+/// </summary>
+public class FlexibleGuidConverter : System.Text.Json.Serialization.JsonConverter<Guid?>
+{
+    public override Guid? Read(ref System.Text.Json.Utf8JsonReader reader, Type typeToConvert, System.Text.Json.JsonSerializerOptions options)
+    {
+        if (reader.TokenType == System.Text.Json.JsonTokenType.Null)
+            return null;
+            
+        if (reader.TokenType == System.Text.Json.JsonTokenType.String)
+        {
+            var stringValue = reader.GetString();
+            if (string.IsNullOrWhiteSpace(stringValue))
+                return null;
+                
+            if (Guid.TryParse(stringValue.Trim(), out var guid))
+                return guid;
+        }
+        
+        return null;
+    }
+
+    public override void Write(System.Text.Json.Utf8JsonWriter writer, Guid? value, System.Text.Json.JsonSerializerOptions options)
+    {
+        if (value.HasValue)
+            writer.WriteStringValue(value.Value.ToString());
+        else
+            writer.WriteNullValue();
+    }
 }

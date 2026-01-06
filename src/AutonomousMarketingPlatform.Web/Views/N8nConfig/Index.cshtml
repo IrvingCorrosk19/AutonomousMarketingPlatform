@@ -446,15 +446,17 @@
             
             // Si hay un campaignId ingresado, validarlo y agregarlo
             // NO enviar instruction ni channels - el backend los generará desde los datos reales de la campaña
-            if (campaignIdInput && campaignIdInput !== '') {
+            if (campaignIdInput && campaignIdInput.trim() !== '') {
                 // Validar formato GUID básico
                 var guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-                if (guidRegex.test(campaignIdInput)) {
-                    requestData.campaignId = campaignIdInput;
+                var trimmedCampaignId = campaignIdInput.trim();
+                if (guidRegex.test(trimmedCampaignId)) {
+                    requestData.campaignId = trimmedCampaignId;
                     hasCampaignId = true;
                     // NO incluir instruction ni channels - el backend los generará desde la campaña
                 } else {
-                    alert('El Campaign ID no tiene un formato válido (GUID). Se enviará sin campaignId.');
+                    console.warn('El Campaign ID no tiene un formato válido (GUID). Se enviará sin campaignId.');
+                    // NO mostrar alert, solo continuar sin campaignId
                 }
             }
             
